@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Beyondworks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+:root {
+  /* Notion DNA — warm neutrals, never cold */
+  --bg: #f6f5f4;
+  --surface: #ffffff;
+  --surface-warm: #f0efed;
+  --ink: rgba(0,0,0,0.92);
+  --ink-secondary: #615d59;
+  --ink-tertiary: #a39e98;
+  --ink-faint: #c8c5c0;
+  --notion-blue: #0075de;
+  --notion-blue-soft: #e8f2fc;
+  --teal: #2a9d99;
+  --teal-soft: #e6f5f4;
+  --green: #1aae39;
+  --green-soft: #e8f7eb;
+  --orange: #dd5b00;
+  --orange-soft: #fef0e4;
+  --red: #eb5757;
+  --red-soft: #fde8e8;
+  --purple: #6b4fbb;
+  --purple-soft: #f0ecfa;
+  --brown: #64473a;
+  --brown-soft: #f3ede9;
+  /* Notion whisper system */
+  --border: rgba(0,0,0,0.08);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.03);
+  --shadow-elevated: 0 2px 8px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-feature-settings: "lnum", "locl";
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  padding-bottom: calc(68px + var(--safe-b));
+  min-height: 100vh;
+}
+
+/* ============ HEADER ============ */
+.hdr {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(246,245,244,0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  padding: 16px 20px 12px;
+  padding-top: calc(16px + var(--safe-t));
+}
+.hdr-row { display:flex; justify-content:space-between; align-items:flex-start; }
+.hdr-brand {
+  font-size: 15px; font-weight: 600; letter-spacing: -0.2px;
+  color: var(--ink-secondary);
+}
+.hdr-hero {
+  font-size: 32px; font-weight: 800; letter-spacing: -1.4px;
+  line-height: 1.05; margin-top: 4px; color: var(--ink);
+}
+.hdr-hero span {
+  background: linear-gradient(135deg, var(--notion-blue), var(--purple));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hdr-sub { font-size: 13px; font-weight: 500; color: var(--ink-tertiary); margin-top: 4px; letter-spacing: -0.1px; }
+.hdr-actions { display: flex; gap: 8px; margin-top: 4px; }
+.hdr-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--ink-secondary); transition: all 0.15s;
+}
+.hdr-btn:active { transform: scale(0.92); }
+.hdr-btn.active { background: var(--ink); color: white; border-color: transparent; }
+
+/* ============ WIDGET SECTIONS — full-bleed horizontal scroll ============ */
+.w-section { margin-top: 20px; }
+.w-section-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 20px; margin-bottom: 10px;
+}
+.w-section-title {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; display: flex; align-items: center; gap: 6px;
+}
+.w-section-title i { width: 15px; height: 15px; }
+.w-section-more {
+  font-size: 12px; font-weight: 600; color: var(--ink-tertiary);
+  display: flex; align-items: center; gap: 2px;
+}
+.w-section-more i { width: 14px; height: 14px; }
+
+/* Horizontal card rail */
+.rail {
+  display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; padding: 0 20px 4px; scroll-snap-type: x proximity;
+}
+.rail::-webkit-scrollbar { display: none; }
+
+/* ============ METRIC STRIP (small cards in a row) ============ */
+.metric-strip { display: flex; gap: 10px; padding: 0 20px; }
+.metric-card {
+  flex: 1; background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-card); padding: 16px; position: relative; overflow: hidden;
+}
+.metric-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.mc-label { font-size: 11px; font-weight: 600; color: var(--ink-tertiary); letter-spacing: 0.2px; }
+.mc-value { font-size: 28px; font-weight: 800; letter-spacing: -1.2px; line-height: 1.1; margin-top: 6px; }
+.mc-sub { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 4px; display: flex; align-items: center; gap: 3px; }
+.mc-sub i { width: 12px; height: 12px; }
+
+/* ============ INSIGHT / WORKS CARD (slide card) ============ */
+.slide-card {
+  flex-shrink: 0; width: 260px; scroll-snap-align: start;
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-card); overflow: hidden;
+  transition: transform 0.15s;
+}
+.slide-card:active { transform: scale(0.97); }
+.sc-cover {
+  height: 100px; position: relative; overflow: hidden;
+  display: flex; align-items: flex-end; padding: 12px;
+}
+.sc-cover-bg {
+  position: absolute; inset: 0;
+}
+.sc-tag {
+  position: relative; z-index: 1;
+  padding: 3px 10px; border-radius: 9999px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.sc-body { padding: 14px; }
+.sc-title {
+  font-size: 15px; font-weight: 700; letter-spacing: -0.25px;
+  line-height: 1.3; color: var(--ink);
+}
+.sc-desc {
+  font-size: 12px; font-weight: 400; color: var(--ink-secondary);
+  margin-top: 5px; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.sc-footer { display: flex; gap: 5px; margin-top: 10px; }
+.pill {
+  padding: 3px 9px; border-radius: 9999px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.05px;
+}
+
+/* ============ TASK LIST CARD ============ */
+.list-card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-card); margin: 0 20px; overflow: hidden;
+}
+.lc-head {
+  padding: 14px 16px 0; display: flex; justify-content: space-between; align-items: center;
+}
+.lc-title { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
+.lc-body { padding: 4px 16px 8px; }
+.li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.li:last-child { border-bottom: none; }
+.li-chk {
+  width: 18px; height: 18px; border-radius: 5px;
+  border: 1.5px solid var(--ink-faint); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.li-chk.done { background: var(--notion-blue); border-color: var(--notion-blue); }
+.li-chk.done i { color: white; }
+.li-content { flex: 1; min-width: 0; }
+.li-name { font-size: 14px; font-weight: 500; letter-spacing: -0.1px; }
+.li-name.done { color: var(--ink-faint); text-decoration: line-through; }
+.li-meta { font-size: 11px; color: var(--ink-tertiary); margin-top: 1px; }
+.li-right { font-size: 12px; font-weight: 600; color: var(--ink-faint); flex-shrink: 0; }
+.li-right.warn { color: var(--orange); }
+.li-right.amount { color: var(--notion-blue); font-size: 14px; font-weight: 700; letter-spacing: -0.3px; }
+
+/* ============ CALENDAR WIDGET ============ */
+.cal-card {
+  flex-shrink: 0; width: 280px; scroll-snap-align: start;
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-card); padding: 16px;
+}
+.cal-month { font-size: 14px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+.cal-nav { display: flex; gap: 6px; }
+.cal-nav i { width: 14px; height: 14px; color: var(--ink-faint); }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; text-align: center; }
+.cal-h { font-size: 9px; font-weight: 600; color: var(--ink-faint); padding: 4px 0; }
+.cal-d { font-size: 11px; font-weight: 500; padding: 5px 0; border-radius: 6px; color: var(--ink-tertiary); position: relative; }
+.cal-d.today { background: var(--ink); color: white; font-weight: 700; }
+.cal-d.event::after { content:''; position:absolute; bottom:1px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--notion-blue); }
+.cal-d.today.event::after { background: white; }
+
+/* Quick action strip */
+.qa-strip { display: flex; gap: 10px; padding: 0 20px; }
+.qa-btn {
+  flex: 1; background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-card); padding: 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  cursor: pointer; transition: transform 0.12s;
+}
+.qa-btn:active { transform: scale(0.94); }
+.qa-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.qa-icon i { width: 20px; height: 20px; }
+.qa-name { font-size: 11px; font-weight: 600; color: var(--ink-secondary); letter-spacing: -0.05px; }
+
+/* ============ EDIT MODE ============ */
+.edit-mode .slide-card, .edit-mode .metric-card, .edit-mode .list-card, .edit-mode .cal-card, .edit-mode .qa-btn {
+  animation: jig 0.22s ease-in-out infinite alternate;
+}
+@keyframes jig { 0%{transform:rotate(-0.6deg)} 100%{transform:rotate(0.6deg)} }
+.edit-mode .slide-card:nth-child(2n), .edit-mode .metric-card:nth-child(2n) { animation-delay: 0.08s; }
+
+/* Add Widget */
+.add-section {
+  margin: 20px; padding: 18px; border: 2px dashed rgba(0,0,0,0.08);
+  border-radius: var(--radius); display: flex; align-items: center; justify-content: center;
+  gap: 8px; color: var(--ink-tertiary); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.add-section:active { border-color: var(--notion-blue); color: var(--notion-blue); }
+.add-section i { width: 16px; height: 16px; }
+
+/* ============ BOTTOM SHEET ============ */
+.overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.25); z-index:200; }
+.overlay.open { display: block; }
+.bsheet {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--surface); border-radius: 20px 20px 0 0; z-index: 201;
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+  max-height: 70vh; overflow-y: auto; padding: 16px 20px;
+  padding-bottom: calc(20px + var(--safe-b));
+}
+.bsheet.open { transform: translateY(0); }
+.bs-handle { width: 36px; height: 4px; border-radius: 2px; background: var(--ink-faint); margin: 0 auto 16px; }
+.bs-title { font-size: 18px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 14px; }
+.bs-opt {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.04);
+  cursor: pointer;
+}
+.bs-opt:last-child { border-bottom: none; }
+.bs-opt:active { opacity: 0.5; }
+.bs-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.bs-icon i { width: 22px; height: 22px; }
+.bs-name { font-size: 15px; font-weight: 600; letter-spacing: -0.15px; }
+.bs-desc { font-size: 12px; color: var(--ink-secondary); margin-top: 2px; }
+
+/* ============ TAB BAR ============ */
+.tabs {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(246,245,244,0.88);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-around;
+  padding: 6px 0; padding-bottom: calc(6px + var(--safe-b)); z-index: 100;
+}
+.tab-i {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 10px; font-weight: 500; color: var(--ink-faint);
+  text-decoration: none; min-width: 56px; padding: 3px 0;
+}
+.tab-i.on { color: var(--notion-blue); }
+.tab-i i { width: 20px; height: 20px; }
+
+/* ============ ANIMATIONS ============ */
+@keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+.anim { animation: slideUp 0.4s ease-out forwards; opacity: 0; }
+.a1{animation-delay:.02s} .a2{animation-delay:.06s} .a3{animation-delay:.1s}
+.a4{animation-delay:.14s} .a5{animation-delay:.18s} .a6{animation-delay:.22s}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-row">
+    <div>
+      <div class="hdr-brand">Beyondworks</div>
+      <div class="hdr-hero">Good <span>Friday</span>.</div>
+      <div class="hdr-sub">2026. 4. 11.</div>
+    </div>
+    <div class="hdr-actions">
+      <button class="hdr-btn" id="editBtn" onclick="toggleEdit()"><i data-lucide="pencil" style="width:16px;height:16px"></i></button>
+      <button class="hdr-btn"><i data-lucide="bell" style="width:16px;height:16px"></i></button>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Metrics ===== -->
+<div class="w-section anim a1">
+  <div class="metric-strip">
+    <div class="metric-card" style="--accent:var(--teal);">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--teal);border-radius:12px 12px 0 0"></div>
+      <div class="mc-label">예정 수입</div>
+      <div class="mc-value" style="color:var(--teal)">530<span style="font-size:16px;font-weight:600;letter-spacing:0">만</span></div>
+      <div class="mc-sub"><i data-lucide="arrow-up-right"></i> 4건 대기</div>
+    </div>
+    <div class="metric-card">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--orange);border-radius:12px 12px 0 0"></div>
+      <div class="mc-label">미완료</div>
+      <div class="mc-value" style="color:var(--orange)">2<span style="font-size:16px;font-weight:600;letter-spacing:0">건</span></div>
+      <div class="mc-sub"><i data-lucide="alert-circle"></i> 확인 필요</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Quick Actions ===== -->
+<div class="w-section anim a2" style="margin-top:14px">
+  <div class="qa-strip">
+    <div class="qa-btn">
+      <div class="qa-icon" style="background:var(--notion-blue-soft)"><i data-lucide="calendar-plus" style="color:var(--notion-blue)"></i></div>
+      <div class="qa-name">일정 추가</div>
+    </div>
+    <div class="qa-btn">
+      <div class="qa-icon" style="background:var(--teal-soft)"><i data-lucide="receipt" style="color:var(--teal)"></i></div>
+      <div class="qa-name">지출 기록</div>
+    </div>
+    <div class="qa-btn">
+      <div class="qa-icon" style="background:var(--purple-soft)"><i data-lucide="file-text" style="color:var(--purple)"></i></div>
+      <div class="qa-name">메모</div>
+    </div>
+    <div class="qa-btn">
+      <div class="qa-icon" style="background:var(--brown-soft)"><i data-lucide="search" style="color:var(--brown)"></i></div>
+      <div class="qa-name">검색</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Insights ===== -->
+<div class="w-section anim a3" style="margin-top:24px">
+  <div class="w-section-head">
+    <div class="w-section-title" style="color:var(--purple)"><i data-lucide="sparkles"></i> 인사이트</div>
+    <div class="w-section-more"><span>더보기</span><i data-lucide="chevron-right"></i></div>
+  </div>
+  <div class="rail">
+    <div class="slide-card">
+      <div class="sc-cover">
+        <div class="sc-cover-bg" style="background:linear-gradient(135deg,#e8dff5,#c9b8e8)"></div>
+        <div class="sc-tag" style="background:rgba(255,255,255,0.7);color:var(--purple)">AI</div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-title">Google Gemma 4 출시 분석</div>
+        <div class="sc-desc">Apache 2.0 라이선스, OpenClaw 공식 지원 확정. MoE 26B 활성 파라미터 3.8B로 에이전트 최적화.</div>
+        <div class="sc-footer"><span class="pill" style="background:var(--purple-soft);color:var(--purple)">오픈소스</span><span class="pill" style="background:rgba(0,0,0,0.04);color:var(--ink-tertiary)">4/5</span></div>
+      </div>
+    </div>
+    <div class="slide-card">
+      <div class="sc-cover">
+        <div class="sc-cover-bg" style="background:linear-gradient(135deg,#fde8e8,#f5c4c4)"></div>
+        <div class="sc-tag" style="background:rgba(255,255,255,0.7);color:var(--red)">Policy</div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-title">Anthropic 4/4 정책 변경</div>
+        <div class="sc-desc">Claude Pro/Max 구독 third-party 에이전트 차단. API 키 또는 Extra Usage 과금 전환.</div>
+        <div class="sc-footer"><span class="pill" style="background:var(--red-soft);color:var(--red)">긴급</span><span class="pill" style="background:rgba(0,0,0,0.04);color:var(--ink-tertiary)">4/4</span></div>
+      </div>
+    </div>
+    <div class="slide-card">
+      <div class="sc-cover">
+        <div class="sc-cover-bg" style="background:linear-gradient(135deg,#e8f2fc,#b8d4f0)"></div>
+        <div class="sc-tag" style="background:rgba(255,255,255,0.7);color:var(--notion-blue)">Design</div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-title">awesome-design-md 35K stars</div>
+        <div class="sc-desc">10일 만에 GitHub 역대 최속 awesome 리스트. DESIGN.md 컨벤션이 새 표준으로 부상.</div>
+        <div class="sc-footer"><span class="pill" style="background:var(--notion-blue-soft);color:var(--notion-blue)">트렌드</span><span class="pill" style="background:rgba(0,0,0,0.04);color:var(--ink-tertiary)">4/9</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Works ===== -->
+<div class="w-section anim a4" style="margin-top:24px">
+  <div class="w-section-head">
+    <div class="w-section-title" style="color:var(--notion-blue)"><i data-lucide="briefcase"></i> 웍스</div>
+    <div class="w-section-more"><span>더보기</span><i data-lucide="chevron-right"></i></div>
+  </div>
+  <div class="rail">
+    <div class="slide-card">
+      <div class="sc-cover">
+        <div class="sc-cover-bg" style="background:linear-gradient(135deg,#e8f2fc,#cde0f5)"></div>
+        <div class="sc-tag" style="background:rgba(255,255,255,0.7);color:var(--notion-blue)">기획</div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-title">세븐플러스 K-art 기획안</div>
+        <div class="sc-desc">기획 방향 1차 검토 완료. 피드백 반영 중.</div>
+        <div class="sc-footer"><span class="pill" style="background:var(--green-soft);color:var(--green)">완료</span></div>
+      </div>
+    </div>
+    <div class="slide-card">
+      <div class="sc-cover">
+        <div class="sc-cover-bg" style="background:linear-gradient(135deg,#fef0e4,#f5d9b8)"></div>
+        <div class="sc-tag" style="background:rgba(255,255,255,0.7);color:var(--orange)">Video</div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-title">Magiclight 영상 대본</div>
+        <div class="sc-desc">초안 전달 완료. 최종 게시 4/14~15 예정.</div>
+        <div class="sc-footer"><span class="pill" style="background:var(--orange-soft);color:var(--orange)">진행중</span></div>
+      </div>
+    </div>
+    <div class="slide-card">
+      <div class="sc-cover">
+        <div class="sc-cover-bg" style="background:linear-gradient(135deg,#e6f5f4,#b8e0de)"></div>
+        <div class="sc-tag" style="background:rgba(255,255,255,0.7);color:var(--teal)">강의</div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-title">해커스 바이브코딩 커리큘럼</div>
+        <div class="sc-desc">2차시 수정본 작업 중. 피봇 관련 논의 필요.</div>
+        <div class="sc-footer"><span class="pill" style="background:var(--orange-soft);color:var(--orange)">진행중</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Tasks + Calendar horizontal rail ===== -->
+<div class="w-section anim a5" style="margin-top:24px">
+  <div class="w-section-head">
+    <div class="w-section-title" style="color:var(--red)"><i data-lucide="check-circle-2"></i> 태스크</div>
+    <div class="w-section-more"><span>더보기</span><i data-lucide="chevron-right"></i></div>
+  </div>
+  <div class="list-card">
+    <div class="lc-body">
+      <div class="li">
+        <div class="li-chk"></div>
+        <div class="li-content"><div class="li-name">해커스 2차시 수정본 전달</div><div class="li-meta">강의 &middot; 해커스캠퍼스</div></div>
+        <div class="li-right warn">4/8</div>
+      </div>
+      <div class="li">
+        <div class="li-chk"></div>
+        <div class="li-content"><div class="li-name">매직라이트 영상 업로드</div><div class="li-meta">Video &middot; Schedule</div></div>
+        <div class="li-right warn">4/8</div>
+      </div>
+      <div class="li">
+        <div class="li-chk"></div>
+        <div class="li-content"><div class="li-name">Magiclight 영상 최종 게시</div><div class="li-meta">Schedule</div></div>
+        <div class="li-right">4/14</div>
+      </div>
+      <div class="li">
+        <div class="li-chk done"><i data-lucide="check" style="width:12px;height:12px"></i></div>
+        <div class="li-content"><div class="li-name done">세븐플러스 미팅</div><div class="li-meta">회의</div></div>
+        <div class="li-right">4/10</div>
+      </div>
+      <div class="li">
+        <div class="li-chk done"><i data-lucide="check" style="width:12px;height:12px"></i></div>
+        <div class="li-content"><div class="li-name done">RelayAX 마곡 미팅</div><div class="li-meta">회의 &middot; 마곡</div></div>
+        <div class="li-right">4/7</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Finance ===== -->
+<div class="w-section anim a6" style="margin-top:24px">
+  <div class="w-section-head">
+    <div class="w-section-title" style="color:var(--teal)"><i data-lucide="banknote"></i> 파이낸스</div>
+    <div class="w-section-more"><span>더보기</span><i data-lucide="chevron-right"></i></div>
+  </div>
+  <div class="list-card">
+    <div class="lc-body">
+      <div class="li"><div class="li-content"><div class="li-name">아카데미</div><div class="li-meta">4/14 (월) 입금 예정</div></div><div class="li-right amount">200만</div></div>
+      <div class="li"><div class="li-content"><div class="li-name">KCC정보통신</div><div class="li-meta">예정일 미정</div></div><div class="li-right amount">150만</div></div>
+      <div class="li"><div class="li-content"><div class="li-name">젠스파크</div><div class="li-meta">예정일 미정</div></div><div class="li-right amount">110만</div></div>
+      <div class="li"><div class="li-content"><div class="li-name">매직라이트</div><div class="li-meta">예정일 미정</div></div><div class="li-right amount">70만</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Section -->
+<div class="add-section" onclick="openSheet()">
+  <i data-lucide="plus"></i> 위젯 섹션 추가
+</div>
+
+<!-- Bottom Sheet -->
+<div class="overlay" id="ov" onclick="closeSheet()"></div>
+<div class="bsheet" id="bs">
+  <div class="bs-handle"></div>
+  <div class="bs-title">위젯 추가</div>
+  <div class="bs-opt" onclick="closeSheet()"><div class="bs-icon" style="background:var(--notion-blue-soft)"><i data-lucide="hash" style="color:var(--notion-blue)"></i></div><div><div class="bs-name">숫자 카드</div><div class="bs-desc">단일 메트릭 (합계, D-day, 카운트)</div></div></div>
+  <div class="bs-opt" onclick="closeSheet()"><div class="bs-icon" style="background:var(--green-soft)"><i data-lucide="list" style="color:var(--green)"></i></div><div><div class="bs-name">리스트</div><div class="bs-desc">체크박스 + 날짜 세로 목록</div></div></div>
+  <div class="bs-opt" onclick="closeSheet()"><div class="bs-icon" style="background:var(--purple-soft)"><i data-lucide="layers" style="color:var(--purple)"></i></div><div><div class="bs-name">카드 슬라이드</div><div class="bs-desc">가로 스와이프 썸네일 카드</div></div></div>
+  <div class="bs-opt" onclick="closeSheet()"><div class="bs-icon" style="background:var(--notion-blue-soft)"><i data-lucide="calendar" style="color:var(--notion-blue)"></i></div><div><div class="bs-name">캘린더</div><div class="bs-desc">월간 미니 캘린더 + 이벤트 도트</div></div></div>
+  <div class="bs-opt" onclick="closeSheet()"><div class="bs-icon" style="background:var(--orange-soft)"><i data-lucide="image" style="color:var(--orange)"></i></div><div><div class="bs-name">갤러리</div><div class="bs-desc">2~3열 이미지 그리드</div></div></div>
+  <div class="bs-opt" onclick="closeSheet()"><div class="bs-icon" style="background:var(--teal-soft)"><i data-lucide="activity" style="color:var(--teal)"></i></div><div><div class="bs-name">프로그레스</div><div class="bs-desc">원형/바 진행률 표시</div></div></div>
+  <div class="bs-opt" onclick="closeSheet()"><div class="bs-icon" style="background:var(--brown-soft)"><i data-lucide="zap" style="color:var(--brown)"></i></div><div><div class="bs-name">퀵 액션</div><div class="bs-desc">원터치 바로가기 버튼</div></div></div>
+</div>
+
+<!-- Tab Bar -->
+<nav class="tabs">
+  <a class="tab-i on"><i data-lucide="home"></i>Home</a>
+  <a class="tab-i"><i data-lucide="search"></i>Search</a>
+  <a class="tab-i"><i data-lucide="check-square"></i>Tasks</a>
+  <a class="tab-i"><i data-lucide="wallet"></i>Finance</a>
+</nav>
+
+<script>
+lucide.createIcons();
+let editing = false;
+function toggleEdit(){
+  editing = !editing;
+  document.body.classList.toggle('edit-mode', editing);
+  document.getElementById('editBtn').classList.toggle('active', editing);
+}
+function openSheet(){ document.getElementById('ov').classList.add('open'); document.getElementById('bs').classList.add('open'); }
+function closeSheet(){ document.getElementById('ov').classList.remove('open'); document.getElementById('bs').classList.remove('open'); }
+let pt;
+document.addEventListener('touchstart',e=>{ if(e.target.closest('.rail')||e.target.closest('.hdr-btn'))return; pt=setTimeout(()=>{if(!editing)toggleEdit()},600); },{passive:true});
+document.addEventListener('touchend',()=>clearTimeout(pt));
+document.addEventListener('touchmove',()=>clearTimeout(pt));
+</script>
+</body>
+</html>
