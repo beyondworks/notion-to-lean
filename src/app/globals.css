@@ -1,8 +1,57 @@
 @import "tailwindcss";
 
+/* ==============================================================
+   Beyondworks Hub v6 — Notion-true warm minimal
+   Notion 공식 팔레트 + 정확 ink 색 + 작은 radius + flat 표면
+   ============================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Notion canvas & surface (exact values) */
+  --n-canvas: #f7f6f3;
+  --n-sidebar: #fbfbfa;
+  --n-surface: #ffffff;
+
+  /* Notion ink (rgb 55,53,47) */
+  --n-ink: rgb(55, 53, 47);
+  --n-ink-80: rgba(55, 53, 47, 0.80);
+  --n-ink-60: rgba(55, 53, 47, 0.60);
+  --n-ink-45: rgba(55, 53, 47, 0.45);
+  --n-ink-25: rgba(55, 53, 47, 0.25);
+
+  /* Notion whisper borders */
+  --n-border:   rgba(55, 53, 47, 0.09);
+  --n-border-2: rgba(55, 53, 47, 0.16);
+  --n-hover:    rgba(55, 53, 47, 0.06);
+  --n-hover-2:  rgba(55, 53, 47, 0.08);
+
+  /* Notion color palette — official 9 colors, bg + text (exact values) */
+  --n-gray-bg:   #f1f1ef;  --n-gray-tx:   rgb(120, 119, 116);
+  --n-brown-bg:  #f4eeee;  --n-brown-tx:  rgb(159, 107, 83);
+  --n-orange-bg: #fbecdd;  --n-orange-tx: rgb(217, 115, 13);
+  --n-yellow-bg: #fbf3db;  --n-yellow-tx: rgb(203, 145, 47);
+  --n-green-bg:  #edf3ec;  --n-green-tx:  rgb(68, 131, 97);
+  --n-blue-bg:   #e7f3f8;  --n-blue-tx:   rgb(51, 126, 169);
+  --n-purple-bg: #f4f0f7;  --n-purple-tx: rgb(144, 101, 176);
+  --n-pink-bg:   #f9eef3;  --n-pink-tx:   rgb(193, 76, 138);
+  --n-red-bg:    #fdebec;  --n-red-tx:    rgb(212, 76, 71);
+
+  /* Shadows: whisper only (Notion is flat by default) */
+  --shadow-whisper:
+    0 1px 2px rgba(15, 15, 15, 0.02),
+    0 2px 6px rgba(15, 15, 15, 0.03);
+
+  --r-card: 10px;
+  --r-row:  6px;
+  --r-tag:  3px;
+  --r-btn:  6px;
+  --r-pill: 9999px;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
+  /* Tailwind-compatible aliases */
+  --background: var(--n-canvas);
+  --foreground: var(--n-ink);
 }
 
 @theme inline {
@@ -12,15 +61,634 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+button { background: none; border: none; font: inherit; cursor: pointer; color: inherit; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-feature-settings: "ss01", "cv11", "lnum";
+  background: var(--n-canvas);
+  color: var(--n-ink);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  padding-bottom: calc(72px + var(--safe-b));
+  min-height: 100vh;
+}
+
+/* ============ HEADER (Notion page header) ============ */
+.hdr {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(247, 246, 243, 0.82);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  padding: calc(18px + var(--safe-t)) 20px 18px;
+}
+.hdr-crumb {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500;
+  color: var(--n-ink-60);
+  margin-bottom: 10px;
+}
+.hdr-crumb i { width: 9px; height: 9px; }
+.hdr-crumb .sep { color: var(--n-ink-25); }
+
+.hdr-topline {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px;
+}
+
+.page-icon {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--n-ink);
+  margin-bottom: 4px;
+  border-radius: 6px;
+  transition: background 0.12s, transform 0.12s;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.page-icon i { width: 19px; height: 19px; }
+.page-icon:hover { background: var(--n-hover-2); }
+.page-icon:active { transform: scale(0.95); }
+.page-icon.empty {
+  width: auto; height: 24px;
+  padding: 0 9px 0 7px;
+  gap: 4px;
+  background: var(--n-hover);
+  color: var(--n-ink-45);
+  font-size: 11px; font-weight: 500;
+  letter-spacing: -0.1px;
+}
+.page-icon.empty:hover { background: var(--n-hover-2); color: var(--n-ink-60); }
+.page-icon.empty i { width: 10px; height: 10px; }
+
+.hdr-actions { display: flex; gap: 6px; }
+.hdr-btn {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: var(--n-surface);
+  border: 1px solid var(--n-border);
+  color: var(--n-ink-60);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, border-color 0.12s;
+}
+.hdr-btn:hover { background: var(--n-hover); border-color: var(--n-border-2); }
+.hdr-btn:active { background: var(--n-hover-2); }
+.hdr-btn.active {
+  background: var(--n-blue-bg);
+  color: var(--n-blue-tx);
+  border-color: transparent;
+}
+.hdr-btn i, .hdr-btn svg { width: 14px; height: 14px; }
+
+.hdr-hero {
+  font-size: 28px; font-weight: 700;
+  letter-spacing: -0.9px; line-height: 1.12;
+  color: var(--n-ink);
+}
+.hdr-sub {
+  margin-top: 4px;
+  font-size: 12px; font-weight: 500;
+  color: var(--n-ink-60);
+  letter-spacing: -0.1px;
+  display: flex; align-items: center; gap: 8px;
+}
+.hdr-sub .dot {
+  width: 3px; height: 3px; border-radius: 9999px;
+  background: var(--n-ink-25);
+}
+
+/* ============ CALLOUT (Notion callout block) ============ */
+.callout {
+  display: flex; gap: 9px; align-items: flex-start;
+  padding: 12px 14px;
+  margin: 14px 20px 0;
+  background: var(--n-gray-bg);
+  border-radius: var(--r-card);
+}
+.callout.blue   { background: var(--n-blue-bg); }
+.callout.orange { background: var(--n-orange-bg); }
+
+.callout-icon {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--n-ink);
+}
+.callout-icon i { width: 11px; height: 11px; }
+
+.callout-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--n-ink);
+  letter-spacing: -0.1px;
+}
+.callout-body strong { font-weight: 600; }
+.callout-body .muted { color: var(--n-ink-60); }
+
+/* ============ SECTION LAYOUT ============ */
+.w-section { margin-top: 22px; }
+.w-section-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 20px; margin-bottom: 9px;
+}
+.w-section-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 600;
+  letter-spacing: -0.18px;
+  color: var(--n-ink);
+}
+.w-section-title i { width: 10px; height: 10px; }
+.w-section-more {
+  display: flex; align-items: center; gap: 1px;
+  font-size: 11px; font-weight: 500;
+  color: var(--n-ink-45);
+  padding: 4px 6px;
+  border-radius: var(--r-btn);
+}
+.w-section-more:hover { background: var(--n-hover-2); }
+.w-section-more i { width: 10px; height: 10px; }
+
+/* ============ METRIC STRIP ============ */
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0 20px;
+}
+.metric-card {
+  background: var(--n-surface);
+  border: 1px solid var(--n-border);
+  border-radius: var(--r-card);
+  padding: 12px 12px 11px;
+  position: relative;
+  min-height: 90px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  overflow: hidden;
+}
+.metric-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent, var(--n-ink-25));
+  border-radius: 10px 10px 0 0;
+}
+.mc-value.teal   { color: #2a9d99; }
+.mc-value.red    { color: var(--n-red-tx); }
+.mc-value.orange { color: var(--n-orange-tx); }
+.mc-icon {
+  display: inline-flex; align-items: center;
+  margin-bottom: 4px;
+  color: var(--n-ink-60);
+}
+.mc-icon i { width: 11px; height: 11px; }
+.mc-icon.blue   { color: var(--n-blue-tx); }
+.mc-icon.teal   { color: #2a9d99; }
+.mc-icon.orange { color: var(--n-orange-tx); }
+.mc-icon.red    { color: var(--n-red-tx); }
+.mc-icon.purple { color: var(--n-purple-tx); }
+.mc-label {
+  font-size: 11px; font-weight: 500;
+  color: var(--n-ink-60);
+  letter-spacing: -0.05px;
+}
+.mc-value {
+  font-size: 22px; font-weight: 700;
+  letter-spacing: -0.7px;
+  line-height: 1.1;
+  color: var(--n-ink);
+  margin-top: 2px;
+  display: flex; align-items: baseline; gap: 3px;
+}
+.mc-value .unit {
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0;
+  color: var(--n-ink-60);
+}
+.mc-sub {
+  margin-top: 5px;
+  font-size: 10px; font-weight: 500;
+  color: var(--n-ink-45);
+  display: flex; align-items: center; gap: 3px;
+}
+.mc-sub i { width: 8px; height: 8px; }
+
+/* ============ HORIZONTAL RAIL ============ */
+.rail {
+  display: flex; gap: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 0 20px 4px;
+  scroll-padding-left: 20px;
+  scroll-snap-type: x proximity;
+}
+.rail::-webkit-scrollbar { display: none; }
+.rail > * { scroll-snap-align: start; flex-shrink: 0; }
+
+/* ============ NOTION CARD (gallery item) ============ */
+.n-card {
+  width: 228px;
+  min-height: 140px;
+  background: var(--n-surface);
+  border: 1px solid var(--n-border);
+  border-radius: var(--r-card);
+  padding: 13px;
+  display: flex; flex-direction: column;
+  transition: background 0.12s, border-color 0.12s;
+}
+.n-card:hover { border-color: var(--n-border-2); }
+.n-card:active { background: var(--n-hover); }
+
+.n-card-cover {
+  margin: -13px -13px 9px;
+  padding: 10px 12px;
+  border-radius: 9px 9px 0 0;
+  height: 72px;
+  display: flex; align-items: flex-end;
+  position: relative;
+}
+.n-card-cover .cover-tag {
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.2px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255,255,255,0.72);
+  position: relative;
+}
+
+.n-card-head {
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 7px;
+}
+.n-page-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  color: var(--n-ink-60);
+}
+.n-page-icon i { width: 10px; height: 10px; }
+.n-page-icon.blue   { color: var(--n-blue-tx); }
+.n-page-icon.purple { color: var(--n-purple-tx); }
+.n-page-icon.red    { color: var(--n-red-tx); }
+.n-page-icon.orange { color: var(--n-orange-tx); }
+.n-page-icon.green  { color: var(--n-green-tx); }
+.n-page-icon.brown  { color: var(--n-brown-tx); }
+.n-page-icon.pink   { color: var(--n-pink-tx); }
+.n-page-icon.gray   { color: var(--n-gray-tx); }
+
+.n-card-meta {
+  font-size: 10px; font-weight: 500;
+  color: var(--n-ink-45);
+  flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.n-card-title {
+  font-size: 13px; font-weight: 600;
+  letter-spacing: -0.18px;
+  line-height: 1.32;
+  color: var(--n-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.n-card-desc {
+  margin-top: 5px;
+  font-size: 12px; font-weight: 400;
+  line-height: 1.5;
+  color: var(--n-ink-60);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.n-card-tags {
+  margin-top: auto;
+  padding-top: 9px;
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+
+/* ============ NOTION TAG (select property) ============ */
+.n-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px 3px;
+  border-radius: var(--r-tag);
+  font-size: 11px; font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.05px;
+  max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.n-tag.gray   { background: var(--n-gray-bg);   color: var(--n-gray-tx); }
+.n-tag.brown  { background: var(--n-brown-bg);  color: var(--n-brown-tx); }
+.n-tag.orange { background: var(--n-orange-bg); color: var(--n-orange-tx); }
+.n-tag.yellow { background: var(--n-yellow-bg); color: var(--n-yellow-tx); }
+.n-tag.green  { background: var(--n-green-bg);  color: var(--n-green-tx); }
+.n-tag.blue   { background: var(--n-blue-bg);   color: var(--n-blue-tx); }
+.n-tag.purple { background: var(--n-purple-bg); color: var(--n-purple-tx); }
+.n-tag.pink   { background: var(--n-pink-bg);   color: var(--n-pink-tx); }
+.n-tag.red    { background: var(--n-red-bg);    color: var(--n-red-tx); }
+
+/* Status property (pill form with dot) */
+.n-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px 3px 7px;
+  border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 500;
+  line-height: 1.2;
+  background: var(--n-gray-bg);
+  color: var(--n-gray-tx);
+}
+.n-status::before {
+  content: '';
+  width: 5px; height: 5px; border-radius: 9999px;
+  background: currentColor;
+}
+.n-status.todo     { background: var(--n-gray-bg);   color: var(--n-gray-tx); }
+.n-status.progress { background: var(--n-orange-bg); color: var(--n-orange-tx); }
+.n-status.done     { background: var(--n-green-bg);  color: var(--n-green-tx); }
+
+/* ============ DATABASE TABLE (Notion DB inline view) ============ */
+.db-card {
+  margin: 0 20px;
+  background: var(--n-surface);
+  border: 1px solid var(--n-border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+.db-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 13px 5px;
+  background: rgba(55, 53, 47, 0.02);
+  border-bottom: 1px solid var(--n-border);
+  font-size: 10px; font-weight: 500;
+  color: var(--n-ink-45);
+  letter-spacing: 0.15px;
+}
+.db-head .h-icon { width: 10px; flex-shrink: 0; }
+.db-head .h-name { flex: 1; }
+.db-head .h-prop { width: 66px; text-align: left; }
+.db-head .h-date { width: 42px; text-align: right; }
+.db-head i, .db-head svg { width: 8px; height: 8px; color: var(--n-ink-45); }
+.db-head span { display: flex; align-items: center; gap: 3px; }
+
+.db-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--n-border);
+  min-height: 44px;
+  transition: background 0.1s;
+}
+.db-row:last-child { border-bottom: none; }
+.db-row:hover { background: var(--n-hover); }
+.db-row:active { background: var(--n-hover-2); }
+
+.db-chk {
+  width: 15px; height: 15px; border-radius: 3px;
+  border: 1.5px solid var(--n-ink-25);
+  background: var(--n-surface);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: transparent;
+}
+.db-chk.done {
+  background: var(--n-ink);
+  border-color: var(--n-ink);
+  color: white;
+}
+.db-chk.done i { width: 7px; height: 7px; }
+
+.db-title {
+  flex: 1; min-width: 0;
+  font-size: 13px; font-weight: 500;
+  color: var(--n-ink);
+  letter-spacing: -0.15px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.db-title.strike {
+  color: var(--n-ink-45);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.db-prop {
+  width: 66px; flex-shrink: 0;
+  display: flex; justify-content: flex-start;
+}
+.db-date {
+  width: 42px; flex-shrink: 0;
+  font-size: 11px; font-weight: 500;
+  color: var(--n-ink-60);
+  text-align: right;
+  letter-spacing: -0.1px;
+}
+.db-date.warn { color: var(--n-orange-tx); font-weight: 600; }
+.db-amount {
+  font-size: 13px; font-weight: 600;
+  color: var(--n-blue-tx);
+  letter-spacing: -0.2px;
+  text-align: right;
+}
+
+/* Finance row variant */
+.db-row.fin .db-title { flex: 1; }
+.db-row.fin .db-prop { width: 70px; }
+.db-row.fin .db-date { width: 50px; }
+
+/* ============ QUICK ACTIONS (subtle) ============ */
+.qa-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 7px; padding: 0 20px;
+}
+.qa-btn {
+  background: var(--n-surface);
+  border: 1px solid var(--n-border);
+  border-radius: var(--r-card);
+  padding: 11px 7px 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: background 0.12s, border-color 0.12s;
+}
+.qa-btn:hover { background: var(--n-hover); }
+.qa-btn:active { background: var(--n-hover-2); }
+.qa-icon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.qa-icon i, .qa-icon svg { width: 15px; height: 15px; }
+.qa-name {
+  font-size: 11px; font-weight: 500;
+  color: var(--n-ink-80);
+  letter-spacing: -0.1px;
+}
+
+/* ============ ADD SECTION (Notion "+ New") ============ */
+.add-section {
+  margin: 22px 20px 0;
+  padding: 12px;
+  border: 1px dashed var(--n-border-2);
+  border-radius: var(--r-card);
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px;
+  color: var(--n-ink-45);
+  font-size: 12px; font-weight: 500;
+  transition: all 0.15s;
+}
+.add-section:hover { background: var(--n-hover); color: var(--n-ink-60); border-color: var(--n-border-2); }
+.add-section:active { background: var(--n-hover-2); }
+.add-section i { width: 10px; height: 10px; }
+
+/* ============ BOTTOM SHEET ============ */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(15, 15, 15, 0.28); z-index: 200; }
+.overlay.open { display: block; }
+.bsheet {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--n-surface);
+  border-radius: 14px 14px 0 0;
+  z-index: 201;
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 72vh; overflow-y: auto;
+  padding: 13px 20px calc(18px + var(--safe-b));
+  box-shadow: 0 -4px 16px rgba(15, 15, 15, 0.08);
+}
+.bsheet.open { transform: translateY(0); }
+.bs-handle {
+  width: 34px; height: 4px; border-radius: 9999px;
+  background: var(--n-border-2);
+  margin: 0 auto 12px;
+}
+.bs-title {
+  font-size: 15px; font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--n-ink);
+  margin-bottom: 10px;
+}
+.bs-opt {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 6px;
+  border-radius: var(--r-row);
+  transition: background 0.1s;
+}
+.bs-opt:hover { background: var(--n-hover); }
+.bs-opt:active { background: var(--n-hover-2); }
+.bs-icon {
+  width: 24px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--n-ink-60);
+}
+.bs-icon i { width: 13px; height: 13px; }
+.bs-name {
+  font-size: 13px; font-weight: 500;
+  color: var(--n-ink);
+  letter-spacing: -0.15px;
+}
+.bs-desc {
+  font-size: 11px;
+  color: var(--n-ink-60);
+  margin-top: 2px;
+  letter-spacing: -0.05px;
+}
+
+/* ============ ICON PICKER ============ */
+.icon-actions {
+  display: flex; gap: 6px;
+  margin-bottom: 10px;
+}
+.icon-action {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px 6px 9px;
+  border-radius: var(--r-btn);
+  background: var(--n-hover);
+  color: var(--n-ink-60);
+  font-size: 12px; font-weight: 500;
+  letter-spacing: -0.1px;
+  transition: background 0.12s, color 0.12s;
+}
+.icon-action:hover { background: var(--n-hover-2); color: var(--n-ink); }
+.icon-action:active { background: var(--n-border-2); }
+.icon-action i { width: 10px; height: 10px; }
+.icon-action.danger:hover { background: var(--n-red-bg); color: var(--n-red-tx); }
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding-top: 2px;
+}
+.icon-cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--n-ink-60);
+  background: transparent;
+  transition: background 0.1s, color 0.1s;
+}
+.icon-cell:hover { background: var(--n-hover-2); color: var(--n-ink); }
+.icon-cell:active { background: var(--n-border-2); }
+.icon-cell.selected {
+  background: var(--n-blue-bg);
+  color: var(--n-blue-tx);
+}
+.icon-cell i { width: 13px; height: 13px; }
+
+/* ============ TAB BAR ============ */
+.tabs {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(247, 246, 243, 0.88);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-top: 1px solid var(--n-border);
+  display: flex; justify-content: space-around;
+  padding: 6px 0 calc(6px + var(--safe-b));
+  z-index: 100;
+}
+.tab-i {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 10px; font-weight: 500;
+  color: var(--n-ink-45);
+  min-width: 54px; padding: 3px 0;
+  text-decoration: none;
+  transition: color 0.12s;
+}
+.tab-i.on { color: var(--n-ink); }
+.tab-i.on i { color: var(--n-ink); }
+.tab-i i { width: 14px; height: 14px; color: var(--n-ink-45); }
+
+/* ============ EDIT / JIGGLE MODE ============ */
+.edit-mode .n-card,
+.edit-mode .metric-card,
+.edit-mode .db-card,
+.edit-mode .qa-btn,
+.edit-mode .callout {
+  animation: jig 0.24s ease-in-out infinite alternate;
+}
+.edit-mode .n-card:nth-child(2n),
+.edit-mode .metric-card:nth-child(2n) { animation-delay: 0.08s; }
+@keyframes jig {
+  0%   { transform: rotate(-0.6deg); }
+  100% { transform: rotate(0.6deg); }
+}
+
+/* ============ ANIMATIONS ============ */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim { animation: rise 0.42s ease-out both; }
+.a1 { animation-delay: 0.02s; }
+.a2 { animation-delay: 0.07s; }
+.a3 { animation-delay: 0.12s; }
+.a4 { animation-delay: 0.17s; }
+.a5 { animation-delay: 0.22s; }
+.a6 { animation-delay: 0.27s; }
+.a7 { animation-delay: 0.32s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim, .edit-mode * { animation: none !important; }
 }
