@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Beyondworks</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -83,12 +86,12 @@ body {
   padding: calc(18px + var(--safe-t)) 20px 18px;  /* 20px matches all other content blocks */
 }
 .hdr-crumb {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 500;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500;
   color: var(--n-ink-60);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
-.hdr-crumb i { width: 13px; height: 13px; }
+.hdr-crumb i { width: 9px; height: 9px; }
 .hdr-crumb .sep { color: var(--n-ink-25); }
 
 .hdr-topline {
@@ -97,38 +100,59 @@ body {
 }
 
 .page-icon {
-  width: 40px; height: 40px;
+  width: 32px; height: 32px;
   display: flex; align-items: center; justify-content: center;
   color: var(--n-ink);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  transition: background 0.12s, transform 0.12s;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
-.page-icon i { width: 34px; height: 34px; }
+.page-icon i { width: 19px; height: 19px; }
+.page-icon:hover { background: var(--n-hover-2); }
+.page-icon:active { transform: scale(0.95); }
+.page-icon.empty {
+  width: auto; height: 24px;
+  padding: 0 9px 0 7px;
+  gap: 4px;
+  background: var(--n-hover);
+  color: var(--n-ink-45);
+  font-size: 11px; font-weight: 500;
+  letter-spacing: -0.1px;
+}
+.page-icon.empty:hover { background: var(--n-hover-2); color: var(--n-ink-60); }
+.page-icon.empty i { width: 10px; height: 10px; }
 
 .hdr-actions { display: flex; gap: 6px; }
 .hdr-btn {
-  width: 32px; height: 32px;
-  border-radius: var(--r-btn);
-  background: transparent;
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: var(--n-surface);
+  border: 1px solid var(--n-border);
   color: var(--n-ink-60);
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.12s;
+  transition: background 0.12s, border-color 0.12s;
 }
-.hdr-btn:hover { background: var(--n-hover-2); }
+.hdr-btn:hover { background: var(--n-hover); border-color: var(--n-border-2); }
 .hdr-btn:active { background: var(--n-hover-2); }
 .hdr-btn.active {
   background: var(--n-blue-bg);
   color: var(--n-blue-tx);
+  border-color: transparent;
 }
-.hdr-btn i { width: 17px; height: 17px; }
+.hdr-btn i, .hdr-btn svg { width: 14px; height: 14px; }
 
 .hdr-hero {
-  font-size: 32px; font-weight: 700;
-  letter-spacing: -1px; line-height: 1.12;
+  font-size: 28px; font-weight: 700;
+  letter-spacing: -0.9px; line-height: 1.12;
   color: var(--n-ink);
 }
 .hdr-sub {
   margin-top: 4px;
-  font-size: 13px; font-weight: 500;
+  font-size: 12px; font-weight: 500;
   color: var(--n-ink-60);
   letter-spacing: -0.1px;
   display: flex; align-items: center; gap: 8px;
@@ -140,9 +164,9 @@ body {
 
 /* ============ CALLOUT (Notion callout block) ============ */
 .callout {
-  display: flex; gap: 10px; align-items: flex-start;
-  padding: 14px 16px;
-  margin: 16px 20px 0;
+  display: flex; gap: 9px; align-items: flex-start;
+  padding: 12px 14px;
+  margin: 14px 20px 0;
   background: var(--n-gray-bg);
   border-radius: var(--r-card);
 }
@@ -151,14 +175,14 @@ body {
 
 .callout-icon {
   flex-shrink: 0;
-  width: 22px; height: 22px;
+  width: 18px; height: 18px;
   display: flex; align-items: center; justify-content: center;
   color: var(--n-ink);
 }
-.callout-icon i { width: 18px; height: 18px; }
+.callout-icon i { width: 11px; height: 11px; }
 
 .callout-body {
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.55;
   color: var(--n-ink);
   letter-spacing: -0.1px;
@@ -167,27 +191,27 @@ body {
 .callout-body .muted { color: var(--n-ink-60); }
 
 /* ============ SECTION LAYOUT ============ */
-.w-section { margin-top: 26px; }
+.w-section { margin-top: 22px; }
 .w-section-head {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 0 20px; margin-bottom: 10px;
+  padding: 0 20px; margin-bottom: 9px;
 }
 .w-section-title {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 15px; font-weight: 600;
-  letter-spacing: -0.2px;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 600;
+  letter-spacing: -0.18px;
   color: var(--n-ink);
 }
-.w-section-title i { width: 15px; height: 15px; }
+.w-section-title i { width: 10px; height: 10px; }
 .w-section-more {
   display: flex; align-items: center; gap: 1px;
-  font-size: 12px; font-weight: 500;
+  font-size: 11px; font-weight: 500;
   color: var(--n-ink-45);
   padding: 4px 6px;
   border-radius: var(--r-btn);
 }
 .w-section-more:hover { background: var(--n-hover-2); }
-.w-section-more i { width: 14px; height: 14px; }
+.w-section-more i { width: 10px; height: 10px; }
 
 /* ============ METRIC STRIP ============ */
 .metric-strip {
@@ -200,47 +224,58 @@ body {
   background: var(--n-surface);
   border: 1px solid var(--n-border);
   border-radius: var(--r-card);
-  padding: 13px 13px 12px;
+  padding: 12px 12px 11px;
   position: relative;
-  min-height: 98px;
+  min-height: 90px;
   display: flex; flex-direction: column; justify-content: space-between;
+  overflow: hidden;
 }
+.metric-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent, var(--n-ink-25));
+  border-radius: 10px 10px 0 0;
+}
+.mc-value.teal   { color: #2a9d99; }
+.mc-value.red    { color: var(--n-red-tx); }
+.mc-value.orange { color: var(--n-orange-tx); }
 .mc-icon {
   display: inline-flex; align-items: center;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   color: var(--n-ink-60);
 }
-.mc-icon i { width: 18px; height: 18px; }
+.mc-icon i { width: 11px; height: 11px; }
 .mc-icon.blue   { color: var(--n-blue-tx); }
 .mc-icon.teal   { color: #2a9d99; }
 .mc-icon.orange { color: var(--n-orange-tx); }
 .mc-icon.red    { color: var(--n-red-tx); }
 .mc-icon.purple { color: var(--n-purple-tx); }
 .mc-label {
-  font-size: 11.5px; font-weight: 500;
+  font-size: 11px; font-weight: 500;
   color: var(--n-ink-60);
   letter-spacing: -0.05px;
 }
 .mc-value {
-  font-size: 24px; font-weight: 700;
-  letter-spacing: -0.8px;
+  font-size: 22px; font-weight: 700;
+  letter-spacing: -0.7px;
   line-height: 1.1;
   color: var(--n-ink);
   margin-top: 2px;
   display: flex; align-items: baseline; gap: 3px;
 }
 .mc-value .unit {
-  font-size: 13px; font-weight: 600;
+  font-size: 12px; font-weight: 600;
   letter-spacing: 0;
   color: var(--n-ink-60);
 }
 .mc-sub {
-  margin-top: 6px;
-  font-size: 11px; font-weight: 500;
+  margin-top: 5px;
+  font-size: 10px; font-weight: 500;
   color: var(--n-ink-45);
   display: flex; align-items: center; gap: 3px;
 }
-.mc-sub i { width: 11px; height: 11px; }
+.mc-sub i { width: 8px; height: 8px; }
 
 /* ============ HORIZONTAL RAIL ============ */
 .rail {
@@ -257,28 +292,47 @@ body {
 
 /* ============ NOTION CARD (gallery item) ============ */
 .n-card {
-  width: 248px;
-  min-height: 152px;
+  width: 228px;
+  min-height: 140px;
   background: var(--n-surface);
   border: 1px solid var(--n-border);
   border-radius: var(--r-card);
-  padding: 14px;
+  padding: 13px;
   display: flex; flex-direction: column;
   transition: background 0.12s, border-color 0.12s;
 }
 .n-card:hover { border-color: var(--n-border-2); }
 .n-card:active { background: var(--n-hover); }
 
+.n-card-cover {
+  margin: -13px -13px 9px;
+  padding: 10px 12px;
+  border-radius: 9px 9px 0 0;
+  height: 72px;
+  display: flex; align-items: flex-end;
+  position: relative;
+}
+.n-card-cover .cover-tag {
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.2px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255,255,255,0.72);
+  position: relative;
+}
+
 .n-card-head {
-  display: flex; align-items: center; gap: 8px;
-  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 7px;
 }
 .n-page-icon {
   display: inline-flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   color: var(--n-ink-60);
 }
-.n-page-icon i { width: 16px; height: 16px; }
+.n-page-icon i { width: 10px; height: 10px; }
 .n-page-icon.blue   { color: var(--n-blue-tx); }
 .n-page-icon.purple { color: var(--n-purple-tx); }
 .n-page-icon.red    { color: var(--n-red-tx); }
@@ -289,15 +343,15 @@ body {
 .n-page-icon.gray   { color: var(--n-gray-tx); }
 
 .n-card-meta {
-  font-size: 11px; font-weight: 500;
+  font-size: 10px; font-weight: 500;
   color: var(--n-ink-45);
   flex: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .n-card-title {
-  font-size: 14.5px; font-weight: 600;
-  letter-spacing: -0.2px;
+  font-size: 13px; font-weight: 600;
+  letter-spacing: -0.18px;
   line-height: 1.32;
   color: var(--n-ink);
   display: -webkit-box;
@@ -306,8 +360,8 @@ body {
   overflow: hidden;
 }
 .n-card-desc {
-  margin-top: 6px;
-  font-size: 12.5px; font-weight: 400;
+  margin-top: 5px;
+  font-size: 12px; font-weight: 400;
   line-height: 1.5;
   color: var(--n-ink-60);
   display: -webkit-box;
@@ -317,16 +371,16 @@ body {
 }
 .n-card-tags {
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: 9px;
   display: flex; flex-wrap: wrap; gap: 4px;
 }
 
 /* ============ NOTION TAG (select property) ============ */
 .n-tag {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 7px 3px;
+  padding: 2px 6px 3px;
   border-radius: var(--r-tag);
-  font-size: 12px; font-weight: 500;
+  font-size: 11px; font-weight: 500;
   line-height: 1.2;
   letter-spacing: -0.05px;
   max-width: 100%;
@@ -345,16 +399,16 @@ body {
 /* Status property (pill form with dot) */
 .n-status {
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 9px 3px 8px;
+  padding: 2px 8px 3px 7px;
   border-radius: var(--r-pill);
-  font-size: 12px; font-weight: 500;
+  font-size: 11px; font-weight: 500;
   line-height: 1.2;
   background: var(--n-gray-bg);
   color: var(--n-gray-tx);
 }
 .n-status::before {
   content: '';
-  width: 6px; height: 6px; border-radius: 9999px;
+  width: 5px; height: 5px; border-radius: 9999px;
   background: currentColor;
 }
 .n-status.todo     { background: var(--n-gray-bg);   color: var(--n-gray-tx); }
@@ -370,26 +424,26 @@ body {
   overflow: hidden;
 }
 .db-head {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 14px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 13px 5px;
   background: rgba(55, 53, 47, 0.02);
   border-bottom: 1px solid var(--n-border);
-  font-size: 11px; font-weight: 500;
+  font-size: 10px; font-weight: 500;
   color: var(--n-ink-45);
-  letter-spacing: 0.1px;
+  letter-spacing: 0.15px;
 }
-.db-head .h-icon { width: 14px; flex-shrink: 0; }
+.db-head .h-icon { width: 10px; flex-shrink: 0; }
 .db-head .h-name { flex: 1; }
-.db-head .h-prop { width: 78px; text-align: left; }
-.db-head .h-date { width: 50px; text-align: right; }
-.db-head i { width: 11px; height: 11px; color: var(--n-ink-45); }
-.db-head span { display: flex; align-items: center; gap: 4px; }
+.db-head .h-prop { width: 66px; text-align: left; }
+.db-head .h-date { width: 42px; text-align: right; }
+.db-head i, .db-head svg { width: 8px; height: 8px; color: var(--n-ink-45); }
+.db-head span { display: flex; align-items: center; gap: 3px; }
 
 .db-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 13px;
   border-bottom: 1px solid var(--n-border);
-  min-height: 48px;
+  min-height: 44px;
   transition: background 0.1s;
 }
 .db-row:last-child { border-bottom: none; }
@@ -397,7 +451,7 @@ body {
 .db-row:active { background: var(--n-hover-2); }
 
 .db-chk {
-  width: 16px; height: 16px; border-radius: 3px;
+  width: 15px; height: 15px; border-radius: 3px;
   border: 1.5px solid var(--n-ink-25);
   background: var(--n-surface);
   flex-shrink: 0;
@@ -409,11 +463,11 @@ body {
   border-color: var(--n-ink);
   color: white;
 }
-.db-chk.done i { width: 10px; height: 10px; }
+.db-chk.done i { width: 7px; height: 7px; }
 
 .db-title {
   flex: 1; min-width: 0;
-  font-size: 13.5px; font-weight: 500;
+  font-size: 13px; font-weight: 500;
   color: var(--n-ink);
   letter-spacing: -0.15px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -424,19 +478,19 @@ body {
   text-decoration-thickness: 1px;
 }
 .db-prop {
-  width: 78px; flex-shrink: 0;
+  width: 66px; flex-shrink: 0;
   display: flex; justify-content: flex-start;
 }
 .db-date {
-  width: 50px; flex-shrink: 0;
-  font-size: 12px; font-weight: 500;
+  width: 42px; flex-shrink: 0;
+  font-size: 11px; font-weight: 500;
   color: var(--n-ink-60);
   text-align: right;
   letter-spacing: -0.1px;
 }
 .db-date.warn { color: var(--n-orange-tx); font-weight: 600; }
 .db-amount {
-  font-size: 13.5px; font-weight: 600;
+  font-size: 13px; font-weight: 600;
   color: var(--n-blue-tx);
   letter-spacing: -0.2px;
   text-align: right;
@@ -444,50 +498,51 @@ body {
 
 /* Finance row variant */
 .db-row.fin .db-title { flex: 1; }
-.db-row.fin .db-prop { width: 82px; }
-.db-row.fin .db-date { width: 60px; }
+.db-row.fin .db-prop { width: 70px; }
+.db-row.fin .db-date { width: 50px; }
 
 /* ============ QUICK ACTIONS (subtle) ============ */
 .qa-strip {
   display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 8px; padding: 0 20px;
+  gap: 7px; padding: 0 20px;
 }
 .qa-btn {
   background: var(--n-surface);
   border: 1px solid var(--n-border);
   border-radius: var(--r-card);
-  padding: 12px 8px 11px;
-  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 11px 7px 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
   transition: background 0.12s, border-color 0.12s;
 }
 .qa-btn:hover { background: var(--n-hover); }
 .qa-btn:active { background: var(--n-hover-2); }
 .qa-icon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
-  color: var(--n-ink-60);
 }
-.qa-icon i { width: 20px; height: 20px; }
+.qa-icon i, .qa-icon svg { width: 15px; height: 15px; }
 .qa-name {
-  font-size: 11.5px; font-weight: 500;
+  font-size: 11px; font-weight: 500;
   color: var(--n-ink-80);
   letter-spacing: -0.1px;
 }
 
 /* ============ ADD SECTION (Notion "+ New") ============ */
 .add-section {
-  margin: 24px 20px 0;
-  padding: 13px;
+  margin: 22px 20px 0;
+  padding: 12px;
   border: 1px dashed var(--n-border-2);
   border-radius: var(--r-card);
   display: flex; align-items: center; justify-content: center;
   gap: 6px;
   color: var(--n-ink-45);
-  font-size: 13px; font-weight: 500;
+  font-size: 12px; font-weight: 500;
   transition: all 0.15s;
 }
 .add-section:hover { background: var(--n-hover); color: var(--n-ink-60); border-color: var(--n-border-2); }
 .add-section:active { background: var(--n-hover-2); }
-.add-section i { width: 14px; height: 14px; }
+.add-section i { width: 10px; height: 10px; }
 
 /* ============ BOTTOM SHEET ============ */
 .overlay { display: none; position: fixed; inset: 0; background: rgba(15, 15, 15, 0.28); z-index: 200; }
@@ -500,47 +555,89 @@ body {
   transform: translateY(100%);
   transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
   max-height: 72vh; overflow-y: auto;
-  padding: 14px 20px calc(20px + var(--safe-b));
+  padding: 13px 20px calc(18px + var(--safe-b));
   box-shadow: 0 -4px 16px rgba(15, 15, 15, 0.08);
 }
 .bsheet.open { transform: translateY(0); }
 .bs-handle {
-  width: 36px; height: 4px; border-radius: 9999px;
+  width: 34px; height: 4px; border-radius: 9999px;
   background: var(--n-border-2);
-  margin: 0 auto 14px;
+  margin: 0 auto 12px;
 }
 .bs-title {
-  font-size: 16px; font-weight: 600;
+  font-size: 15px; font-weight: 600;
   letter-spacing: -0.3px;
   color: var(--n-ink);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .bs-opt {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 6px;
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 6px;
   border-radius: var(--r-row);
   transition: background 0.1s;
 }
 .bs-opt:hover { background: var(--n-hover); }
 .bs-opt:active { background: var(--n-hover-2); }
 .bs-icon {
-  width: 28px;
+  width: 24px;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   color: var(--n-ink-60);
 }
-.bs-icon i { width: 20px; height: 20px; }
+.bs-icon i { width: 13px; height: 13px; }
 .bs-name {
-  font-size: 14px; font-weight: 500;
+  font-size: 13px; font-weight: 500;
   color: var(--n-ink);
   letter-spacing: -0.15px;
 }
 .bs-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--n-ink-60);
   margin-top: 2px;
   letter-spacing: -0.05px;
 }
+
+/* ============ ICON PICKER ============ */
+.icon-actions {
+  display: flex; gap: 6px;
+  margin-bottom: 10px;
+}
+.icon-action {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px 6px 9px;
+  border-radius: var(--r-btn);
+  background: var(--n-hover);
+  color: var(--n-ink-60);
+  font-size: 12px; font-weight: 500;
+  letter-spacing: -0.1px;
+  transition: background 0.12s, color 0.12s;
+}
+.icon-action:hover { background: var(--n-hover-2); color: var(--n-ink); }
+.icon-action:active { background: var(--n-border-2); }
+.icon-action i { width: 10px; height: 10px; }
+.icon-action.danger:hover { background: var(--n-red-bg); color: var(--n-red-tx); }
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding-top: 2px;
+}
+.icon-cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--n-ink-60);
+  background: transparent;
+  transition: background 0.1s, color 0.1s;
+}
+.icon-cell:hover { background: var(--n-hover-2); color: var(--n-ink); }
+.icon-cell:active { background: var(--n-border-2); }
+.icon-cell.selected {
+  background: var(--n-blue-bg);
+  color: var(--n-blue-tx);
+}
+.icon-cell i { width: 13px; height: 13px; }
 
 /* ============ TAB BAR ============ */
 .tabs {
@@ -557,13 +654,13 @@ body {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   font-size: 10px; font-weight: 500;
   color: var(--n-ink-45);
-  min-width: 56px; padding: 3px 0;
+  min-width: 54px; padding: 3px 0;
   text-decoration: none;
   transition: color 0.12s;
 }
 .tab-i.on { color: var(--n-ink); }
 .tab-i.on i { color: var(--n-ink); }
-.tab-i i { width: 19px; height: 19px; color: var(--n-ink-45); }
+.tab-i i { width: 14px; height: 14px; color: var(--n-ink-45); }
 
 /* ============ EDIT / JIGGLE MODE ============ */
 .edit-mode .n-card,
@@ -611,7 +708,7 @@ body {
   </div>
   <div class="hdr-topline">
     <div>
-      <div class="page-icon"><i data-lucide="layout-dashboard"></i></div>
+      <button class="page-icon" data-icon="layout-dashboard" onclick="openIconPicker()" aria-label="페이지 아이콘 변경"><i data-lucide="layout-dashboard"></i></button>
       <div class="hdr-hero">Good Friday</div>
       <div class="hdr-sub">
         <span>2026. 4. 11.</span>
@@ -640,27 +737,27 @@ body {
 <!-- ============ METRICS ============ -->
 <section class="w-section anim a2" style="margin-top: 18px;">
   <div class="metric-strip">
-    <div class="metric-card">
+    <div class="metric-card" style="--accent: #2a9d99;">
       <div>
         <div class="mc-icon teal"><i data-lucide="arrow-down-to-line"></i></div>
         <div class="mc-label">예정 수입</div>
-        <div class="mc-value">530<span class="unit">만원</span></div>
+        <div class="mc-value teal">530<span class="unit">만원</span></div>
       </div>
       <div class="mc-sub"><i data-lucide="arrow-up-right"></i> 4건 대기</div>
     </div>
-    <div class="metric-card">
+    <div class="metric-card" style="--accent: var(--n-red-tx);">
       <div>
         <div class="mc-icon red"><i data-lucide="timer"></i></div>
         <div class="mc-label">D-Day</div>
-        <div class="mc-value">3<span class="unit">일</span></div>
+        <div class="mc-value red">3<span class="unit">일</span></div>
       </div>
       <div class="mc-sub"><i data-lucide="flag"></i> 매직라이트 게시</div>
     </div>
-    <div class="metric-card">
+    <div class="metric-card" style="--accent: var(--n-orange-tx);">
       <div>
         <div class="mc-icon orange"><i data-lucide="alert-circle"></i></div>
         <div class="mc-label">미완료</div>
-        <div class="mc-value">2<span class="unit">건</span></div>
+        <div class="mc-value orange">2<span class="unit">건</span></div>
       </div>
       <div class="mc-sub"><i data-lucide="clock-3"></i> 마감 지연</div>
     </div>
@@ -671,19 +768,19 @@ body {
 <section class="w-section anim a3" style="margin-top: 14px;">
   <div class="qa-strip">
     <button class="qa-btn">
-      <div class="qa-icon" style="color: var(--n-blue-tx);"><i data-lucide="calendar-plus"></i></div>
+      <div class="qa-icon" style="background: var(--n-blue-bg); color: var(--n-blue-tx);"><i data-lucide="calendar-plus"></i></div>
       <span class="qa-name">일정 추가</span>
     </button>
     <button class="qa-btn">
-      <div class="qa-icon" style="color: var(--n-green-tx);"><i data-lucide="receipt"></i></div>
+      <div class="qa-icon" style="background: var(--n-green-bg); color: var(--n-green-tx);"><i data-lucide="receipt"></i></div>
       <span class="qa-name">지출 기록</span>
     </button>
     <button class="qa-btn">
-      <div class="qa-icon" style="color: var(--n-purple-tx);"><i data-lucide="file-text"></i></div>
+      <div class="qa-icon" style="background: var(--n-purple-bg); color: var(--n-purple-tx);"><i data-lucide="file-text"></i></div>
       <span class="qa-name">메모</span>
     </button>
     <button class="qa-btn">
-      <div class="qa-icon" style="color: var(--n-gray-tx);"><i data-lucide="search"></i></div>
+      <div class="qa-icon" style="background: var(--n-gray-bg); color: var(--n-gray-tx);"><i data-lucide="search"></i></div>
       <span class="qa-name">검색</span>
     </button>
   </div>
@@ -697,39 +794,36 @@ body {
   </div>
   <div class="rail">
     <div class="n-card">
-      <div class="n-card-head">
-        <div class="n-page-icon purple"><i data-lucide="sparkles"></i></div>
-        <div class="n-card-meta">Insight · 4/5</div>
+      <div class="n-card-cover" style="background: linear-gradient(135deg, #ebe4f7, #d4c6ec);">
+        <span class="cover-tag" style="color: var(--n-purple-tx);">AI</span>
       </div>
       <div class="n-card-title">Google Gemma 4 출시 분석</div>
       <div class="n-card-desc">Apache 2.0 라이선스, OpenClaw 공식 지원 확정. MoE 26B 활성 파라미터 3.8B로 에이전트 최적화.</div>
       <div class="n-card-tags">
-        <span class="n-tag purple">AI</span>
-        <span class="n-tag gray">오픈소스</span>
+        <span class="n-tag purple">오픈소스</span>
+        <span class="n-tag gray">4/5</span>
       </div>
     </div>
     <div class="n-card">
-      <div class="n-card-head">
-        <div class="n-page-icon red"><i data-lucide="alert-triangle"></i></div>
-        <div class="n-card-meta">Policy · 4/4</div>
+      <div class="n-card-cover" style="background: linear-gradient(135deg, #fde8e8, #f5c4c4);">
+        <span class="cover-tag" style="color: var(--n-red-tx);">Policy</span>
       </div>
       <div class="n-card-title">Anthropic 4/4 정책 변경</div>
       <div class="n-card-desc">Claude Pro/Max 구독 third-party 에이전트 차단. API 키 또는 Extra Usage 과금 전환.</div>
       <div class="n-card-tags">
         <span class="n-tag red">긴급</span>
-        <span class="n-tag gray">공지</span>
+        <span class="n-tag gray">4/4</span>
       </div>
     </div>
     <div class="n-card">
-      <div class="n-card-head">
-        <div class="n-page-icon blue"><i data-lucide="star"></i></div>
-        <div class="n-card-meta">Trend · 4/9</div>
+      <div class="n-card-cover" style="background: linear-gradient(135deg, #e1eef8, #b8d4f0);">
+        <span class="cover-tag" style="color: var(--n-blue-tx);">Design</span>
       </div>
       <div class="n-card-title">awesome-design-md 35K stars</div>
       <div class="n-card-desc">10일 만에 GitHub 역대 최속 awesome 리스트. DESIGN.md 컨벤션이 새 표준으로 부상.</div>
       <div class="n-card-tags">
-        <span class="n-tag blue">디자인</span>
-        <span class="n-tag gray">트렌드</span>
+        <span class="n-tag blue">트렌드</span>
+        <span class="n-tag gray">4/9</span>
       </div>
     </div>
   </div>
@@ -743,39 +837,33 @@ body {
   </div>
   <div class="rail">
     <div class="n-card">
-      <div class="n-card-head">
-        <div class="n-page-icon blue"><i data-lucide="file-text"></i></div>
-        <div class="n-card-meta">기획 · 세븐플러스</div>
+      <div class="n-card-cover" style="background: linear-gradient(135deg, #e1eef8, #cde0f5);">
+        <span class="cover-tag" style="color: var(--n-blue-tx);">기획</span>
       </div>
       <div class="n-card-title">세븐플러스 K-art 기획안</div>
       <div class="n-card-desc">기획 방향 1차 검토 완료. 피드백 반영 중.</div>
       <div class="n-card-tags">
         <span class="n-status done">완료</span>
-        <span class="n-tag blue">기획</span>
       </div>
     </div>
     <div class="n-card">
-      <div class="n-card-head">
-        <div class="n-page-icon orange"><i data-lucide="clapperboard"></i></div>
-        <div class="n-card-meta">Video · 매직라이트</div>
+      <div class="n-card-cover" style="background: linear-gradient(135deg, #fef0e4, #f5d9b8);">
+        <span class="cover-tag" style="color: var(--n-orange-tx);">Video</span>
       </div>
       <div class="n-card-title">Magiclight 영상 대본</div>
       <div class="n-card-desc">초안 전달 완료. 최종 게시 4/14~15 예정.</div>
       <div class="n-card-tags">
         <span class="n-status progress">진행중</span>
-        <span class="n-tag orange">Video</span>
       </div>
     </div>
     <div class="n-card">
-      <div class="n-card-head">
-        <div class="n-page-icon green"><i data-lucide="graduation-cap"></i></div>
-        <div class="n-card-meta">강의 · 해커스</div>
+      <div class="n-card-cover" style="background: linear-gradient(135deg, #e6f5f4, #b8e0de);">
+        <span class="cover-tag" style="color: var(--n-green-tx);">강의</span>
       </div>
       <div class="n-card-title">해커스 바이브코딩 커리큘럼</div>
       <div class="n-card-desc">2차시 수정본 작업 중. 피봇 관련 논의 필요.</div>
       <div class="n-card-tags">
         <span class="n-status progress">진행중</span>
-        <span class="n-tag green">강의</span>
       </div>
     </div>
   </div>
@@ -837,8 +925,8 @@ body {
     <div class="db-head">
       <div class="h-icon"></div>
       <div class="h-name"><span><i data-lucide="type"></i> 클라이언트</span></div>
-      <div class="h-prop" style="width: 82px;"><span><i data-lucide="calendar-clock"></i> 예정</span></div>
-      <div class="h-date" style="width: 60px;"><span><i data-lucide="coins"></i> 금액</span></div>
+      <div class="h-prop" style="width: 70px;"><span><i data-lucide="calendar-clock"></i> 예정</span></div>
+      <div class="h-date" style="width: 50px;"><span><i data-lucide="coins"></i> 금액</span></div>
     </div>
     <div class="db-row fin">
       <div class="n-page-icon blue"><i data-lucide="building-2"></i></div>
@@ -907,6 +995,55 @@ body {
   </div>
 </div>
 
+<!-- ============ ICON PICKER SHEET ============ -->
+<div class="overlay" id="icon-ov" onclick="closeIconPicker()"></div>
+<div class="bsheet" id="icon-bs">
+  <div class="bs-handle"></div>
+  <div class="bs-title">페이지 아이콘</div>
+  <div class="icon-actions">
+    <button class="icon-action" onclick="randomIcon()"><i data-lucide="shuffle"></i> 랜덤</button>
+    <button class="icon-action danger" onclick="removeIcon()"><i data-lucide="trash-2"></i> 제거</button>
+  </div>
+  <div class="icon-grid" id="icon-grid">
+    <button class="icon-cell" data-icon="layout-dashboard"><i data-lucide="layout-dashboard"></i></button>
+    <button class="icon-cell" data-icon="home"><i data-lucide="home"></i></button>
+    <button class="icon-cell" data-icon="layout-grid"><i data-lucide="layout-grid"></i></button>
+    <button class="icon-cell" data-icon="inbox"><i data-lucide="inbox"></i></button>
+    <button class="icon-cell" data-icon="folder"><i data-lucide="folder"></i></button>
+    <button class="icon-cell" data-icon="briefcase"><i data-lucide="briefcase"></i></button>
+    <button class="icon-cell" data-icon="file-text"><i data-lucide="file-text"></i></button>
+    <button class="icon-cell" data-icon="clipboard-list"><i data-lucide="clipboard-list"></i></button>
+    <button class="icon-cell" data-icon="book-open"><i data-lucide="book-open"></i></button>
+    <button class="icon-cell" data-icon="notebook-pen"><i data-lucide="notebook-pen"></i></button>
+    <button class="icon-cell" data-icon="bell"><i data-lucide="bell"></i></button>
+    <button class="icon-cell" data-icon="mail"><i data-lucide="mail"></i></button>
+    <button class="icon-cell" data-icon="message-square"><i data-lucide="message-square"></i></button>
+    <button class="icon-cell" data-icon="calendar"><i data-lucide="calendar"></i></button>
+    <button class="icon-cell" data-icon="calendar-days"><i data-lucide="calendar-days"></i></button>
+    <button class="icon-cell" data-icon="clock-3"><i data-lucide="clock-3"></i></button>
+    <button class="icon-cell" data-icon="timer"><i data-lucide="timer"></i></button>
+    <button class="icon-cell" data-icon="user"><i data-lucide="user"></i></button>
+    <button class="icon-cell" data-icon="users"><i data-lucide="users"></i></button>
+    <button class="icon-cell" data-icon="heart"><i data-lucide="heart"></i></button>
+    <button class="icon-cell" data-icon="box"><i data-lucide="box"></i></button>
+    <button class="icon-cell" data-icon="package"><i data-lucide="package"></i></button>
+    <button class="icon-cell" data-icon="bookmark"><i data-lucide="bookmark"></i></button>
+    <button class="icon-cell" data-icon="tag"><i data-lucide="tag"></i></button>
+    <button class="icon-cell" data-icon="flag"><i data-lucide="flag"></i></button>
+    <button class="icon-cell" data-icon="sun"><i data-lucide="sun"></i></button>
+    <button class="icon-cell" data-icon="moon"><i data-lucide="moon"></i></button>
+    <button class="icon-cell" data-icon="star"><i data-lucide="star"></i></button>
+    <button class="icon-cell" data-icon="sparkles"><i data-lucide="sparkles"></i></button>
+    <button class="icon-cell" data-icon="leaf"><i data-lucide="leaf"></i></button>
+    <button class="icon-cell" data-icon="zap"><i data-lucide="zap"></i></button>
+    <button class="icon-cell" data-icon="compass"><i data-lucide="compass"></i></button>
+    <button class="icon-cell" data-icon="map-pin"><i data-lucide="map-pin"></i></button>
+    <button class="icon-cell" data-icon="target"><i data-lucide="target"></i></button>
+    <button class="icon-cell" data-icon="rocket"><i data-lucide="rocket"></i></button>
+    <button class="icon-cell" data-icon="lightbulb"><i data-lucide="lightbulb"></i></button>
+  </div>
+</div>
+
 <!-- ============ TAB BAR ============ -->
 <nav class="tabs">
   <a class="tab-i on"><i data-lucide="home"></i>Home</a>
@@ -933,10 +1070,73 @@ body {
     document.getElementById('bs').classList.remove('open');
   }
 
-  /* Long-press anywhere (not on rails/buttons) to toggle edit */
+  /* ========== ICON PICKER ========== */
+  const iconOv = document.getElementById('icon-ov');
+  const iconBs = document.getElementById('icon-bs');
+  const pageIcon = document.querySelector('.page-icon');
+  /* Allowlist built from the picker grid itself — prevents arbitrary strings reaching the DOM */
+  const ICON_POOL = Array.from(document.querySelectorAll('#icon-grid .icon-cell'))
+    .map(c => c.dataset.icon);
+
+  function clearChildren(el) {
+    while (el.firstChild) el.removeChild(el.firstChild);
+  }
+
+  function openIconPicker() {
+    iconOv.classList.add('open');
+    iconBs.classList.add('open');
+    markSelectedCell();
+  }
+  function closeIconPicker() {
+    iconOv.classList.remove('open');
+    iconBs.classList.remove('open');
+  }
+  function pickIcon(name) {
+    if (!ICON_POOL.includes(name)) return;  /* reject anything not in allowlist */
+    pageIcon.classList.remove('empty');
+    pageIcon.dataset.icon = name;
+    clearChildren(pageIcon);
+    const i = document.createElement('i');
+    i.setAttribute('data-lucide', name);
+    pageIcon.appendChild(i);
+    lucide.createIcons();
+    closeIconPicker();
+  }
+  function removeIcon() {
+    pageIcon.classList.add('empty');
+    delete pageIcon.dataset.icon;
+    clearChildren(pageIcon);
+    const i = document.createElement('i');
+    i.setAttribute('data-lucide', 'plus');
+    const span = document.createElement('span');
+    span.textContent = '아이콘 추가';
+    pageIcon.appendChild(i);
+    pageIcon.appendChild(span);
+    lucide.createIcons();
+    closeIconPicker();
+  }
+  function randomIcon() {
+    const pool = ICON_POOL.filter(n => n !== pageIcon.dataset.icon);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (pick) pickIcon(pick);
+  }
+  function markSelectedCell() {
+    const current = pageIcon.dataset.icon;
+    document.querySelectorAll('.icon-cell').forEach(c => {
+      c.classList.toggle('selected', c.dataset.icon === current);
+    });
+  }
+  /* Delegate clicks on icon grid to pickIcon() */
+  document.getElementById('icon-grid').addEventListener('click', (e) => {
+    const cell = e.target.closest('.icon-cell');
+    if (cell && cell.dataset.icon) pickIcon(cell.dataset.icon);
+  });
+
+  /* Long-press anywhere (not on rails/buttons/picker/page-icon) to toggle edit */
   let pt;
   document.addEventListener('touchstart', (e) => {
-    if (e.target.closest('.rail') || e.target.closest('.hdr-btn') || e.target.closest('.db-row')) return;
+    if (e.target.closest('.rail') || e.target.closest('.hdr-btn') || e.target.closest('.db-row') ||
+        e.target.closest('.bsheet') || e.target.closest('.page-icon')) return;
     pt = setTimeout(() => { if (!editing) toggleEdit(); }, 600);
   }, { passive: true });
   document.addEventListener('touchend',  () => clearTimeout(pt));
