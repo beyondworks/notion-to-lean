@@ -65,11 +65,8 @@ export async function GET() {
     const data: Task[] = pages.map(pageToTask);
     return NextResponse.json({ data, mock: false });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json(
-      { error: 'Failed to fetch tasks', detail: message },
-      { status: 500 },
-    );
+    console.warn('[notion fallback]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ data: MOCK_TASKS, mock: true, fallback: true });
   }
 }
 
@@ -119,10 +116,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, mock: false });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json(
-      { error: 'Failed to update task', detail: message },
-      { status: 500 },
-    );
+    console.warn('[notion fallback]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ data: MOCK_TASKS, mock: true, fallback: true });
   }
 }

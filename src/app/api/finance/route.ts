@@ -74,10 +74,7 @@ export async function GET() {
 
     return NextResponse.json({ data, mock: false });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json(
-      { error: 'Failed to fetch finance data', detail: message },
-      { status: 500 },
-    );
+    console.warn('[notion fallback]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ data: MOCK_FINANCE, mock: true, fallback: true });
   }
 }

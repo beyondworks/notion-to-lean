@@ -84,10 +84,7 @@ export async function GET() {
     const data: Insight[] = pages.map(pageToInsight);
     return NextResponse.json({ data, mock: false });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json(
-      { error: 'Failed to fetch insights', detail: message },
-      { status: 500 },
-    );
+    console.warn('[notion fallback]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ data: MOCK_INSIGHTS, mock: true, fallback: true });
   }
 }
