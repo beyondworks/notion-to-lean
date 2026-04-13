@@ -1,525 +1,270 @@
 'use client';
 
-import { useState } from 'react';
 import {
-  Lightbulb,
-  ArrowDownToLine,
-  ArrowUpRight,
-  Timer,
-  Flag,
-  AlertCircle,
-  Clock3,
-  CalendarPlus,
-  Receipt,
-  FileText,
-  Search,
-  Sparkles,
-  Briefcase,
-  CheckCircle2,
-  Type,
-  Tag,
+  LayoutGrid,
+  User,
   Calendar,
-  Banknote,
-  CalendarClock,
-  Coins,
+  ListChecks,
   Check,
+  ChevronRight,
   Plus,
-  Hash,
-  List,
-  Layers,
-  Image,
-  Activity,
+  Palette,
+  Briefcase,
+  Wallet,
+  Lightbulb,
+  FileText,
+  Clock,
+  BarChart3,
   Zap,
-  Building2,
-  ArrowLeft,
-  ChevronDown,
 } from 'lucide-react';
-import Header from '@/components/Header';
-import SectionHead from '@/components/SectionHead';
-import MetricCard from '@/components/MetricCard';
-import SlideCard from '@/components/SlideCard';
-import DBTable from '@/components/DBTable';
-import BottomSheet from '@/components/BottomSheet';
-import LoadingSkeleton from '@/components/LoadingSkeleton';
-import ErrorState from '@/components/ErrorState';
-import { useNotionData } from '@/lib/hooks';
-import type { Task, FinanceEntry, Insight, Work } from '@/lib/types';
 
-const DB_OPTIONS = ['Beyond_Tasks', '타임라인(가계부)', '예정 수입/지출', 'Insights', 'Works'];
-const SIZE_OPTIONS = ['Small', 'Medium', 'Large'];
+/* ── Mock Data ── */
+const TASKS = [
+  { id: '1', title: 'Stitch 디자인 시스템 정리', done: true },
+  { id: '2', title: 'Notion API 연동 테스트', done: true },
+  { id: '3', title: '대시보드 위젯 레이아웃', done: false },
+  { id: '4', title: '사용자 온보딩 플로우 작성', done: false },
+  { id: '5', title: '주간 리포트 자동화', done: false },
+];
+
+const MEMOS = [
+  { id: '1', title: '프로젝트 회고 - Q1', subtitle: '2026년 1분기 성과 정리', color: '#e7e2d9' },
+  { id: '2', title: 'API 아키텍처 메모', subtitle: 'Notion + Vercel 통합 구조', color: '#dbeafe' },
+  { id: '3', title: '디자인 리서치 노트', subtitle: 'M3 컬러 시스템 분석', color: '#fce7d6' },
+];
+
+const FOCUS_AREAS = [
+  { icon: Palette, label: 'Design', bg: 'rgba(0, 103, 137, 0.08)', color: '#006789' },
+  { icon: Briefcase, label: 'Work', bg: 'rgba(97, 94, 87, 0.08)', color: '#615e57' },
+  { icon: Wallet, label: 'Finance', bg: 'rgba(158, 66, 44, 0.08)', color: '#9e422c' },
+  { icon: Lightbulb, label: 'Insights', bg: 'rgba(0, 103, 137, 0.08)', color: '#006789' },
+];
 
 export default function HomePage() {
-  const [widgetSheetOpen, setWidgetSheetOpen] = useState(false);
-  const [configWidgetType, setConfigWidgetType] = useState<string | null>(null);
-  const [configDb, setConfigDb] = useState(DB_OPTIONS[0]);
-  const [configSize, setConfigSize] = useState('Medium');
-  const [dbDropdownOpen, setDbDropdownOpen] = useState(false);
-  const [widgetAddedMsg, setWidgetAddedMsg] = useState(false);
+  const today = new Date();
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayLabel = `${dayNames[today.getDay()]}, ${monthNames[today.getMonth()]} ${today.getDate()}`;
 
-  const { data: tasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useNotionData<Task[]>('tasks');
-  const { data: finance, loading: financeLoading, error: financeError, refetch: refetchFinance } = useNotionData<FinanceEntry[]>('finance');
-  const { data: insights, loading: insightsLoading, error: insightsError } = useNotionData<Insight[]>('insights');
-  const { data: works, loading: worksLoading, error: worksError } = useNotionData<Work[]>('works');
-
-  // Metric calculations
-  const incomeTotal = finance
-    ? finance.filter((f) => f.type === 'income').reduce((sum, f) => sum + f.amount, 0)
-    : 0;
-  const incomeMan = Math.round(incomeTotal / 10000);
-
-  const undoneTasks = tasks ? tasks.filter((t) => !t.done) : [];
-  const undoneCount = undoneTasks.length;
-
-  const dDay = tasks
-    ? tasks
-        .filter((t) => !t.done && t.dueDate)
-        .map((t) => Math.ceil((new Date(t.dueDate!).getTime() - Date.now()) / 86400000))
-        .sort((a, b) => a - b)[0] ?? 0
-    : 0;
-
-  function handleWidgetSelect(type: string) {
-    setWidgetSheetOpen(false);
-    setConfigWidgetType(type);
-    setConfigDb(DB_OPTIONS[0]);
-    setConfigSize('Medium');
-    setDbDropdownOpen(false);
-  }
-
-  function handleConfigClose() {
-    setConfigWidgetType(null);
-    setDbDropdownOpen(false);
-  }
-
-  function handleConfigBack() {
-    setConfigWidgetType(null);
-    setDbDropdownOpen(false);
-    setWidgetSheetOpen(true);
-  }
-
-  function handleWidgetAdd() {
-    handleConfigClose();
-    setWidgetAddedMsg(true);
-    setTimeout(() => setWidgetAddedMsg(false), 2000);
-  }
+  const doneCount = TASKS.filter((t) => t.done).length;
+  const donePct = Math.round((doneCount / TASKS.length) * 100);
 
   return (
-    <>
-      <Header />
-
-      {/* ============ CALLOUT ============ */}
-      <div className="callout anim a1">
-        <div className="callout-icon">
-          <Lightbulb size={11} />
-        </div>
-        <div className="callout-body">
-          <strong>오늘의 포커스</strong> — 해커스 2차시 수정본 전달 · 매직라이트 영상 최종 게시
-          <br />
-          <span className="muted">오후 2시 세븐플러스 미팅, 저녁 RelayAX 피드백 정리</span>
-        </div>
-      </div>
-
-      {/* ============ METRICS ============ */}
-      <section className="w-section anim a2" style={{ marginTop: 18 }}>
-        {(tasksLoading || financeLoading) ? (
-          <LoadingSkeleton variant="metric" />
-        ) : (
-          <div className="metric-strip">
-            <MetricCard
-              accent="#2a9d99"
-              icon={<ArrowDownToLine size={11} />}
-              iconColor="teal"
-              label="예정 수입"
-              value={incomeMan}
-              unit="만원"
-              valueColor="teal"
-              sub={<><ArrowUpRight size={8} /> {finance ? finance.filter((f) => f.type === 'income').length : 0}건 대기</>}
-            />
-            <MetricCard
-              accent="var(--n-red-tx)"
-              icon={<Timer size={11} />}
-              iconColor="red"
-              label="D-Day"
-              value={dDay}
-              unit="일"
-              valueColor="red"
-              sub={<><Flag size={8} /> 최근 마감</>}
-            />
-            <MetricCard
-              accent="var(--n-orange-tx)"
-              icon={<AlertCircle size={11} />}
-              iconColor="orange"
-              label="미완료"
-              value={undoneCount}
-              unit="건"
-              valueColor="orange"
-              sub={<><Clock3 size={8} /> 마감 지연</>}
-            />
+    <div className="page-content" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {/* ── Top App Bar ── */}
+      <header className="top-bar">
+        <div className="top-bar-left">
+          <div className="top-bar-icon">
+            <LayoutGrid />
           </div>
-        )}
+          <span className="top-bar-title">Beyondworks</span>
+        </div>
+        <div className="top-bar-avatar">
+          <User />
+        </div>
+      </header>
+
+      {/* ── Welcome Section ── */}
+      <section className="welcome anim-in">
+        <p className="welcome-label">{dayLabel}</p>
+        <h1 className="welcome-title">Good Morning.</h1>
       </section>
 
-      {/* ============ QUICK ACTIONS ============ */}
-      <section className="w-section anim a3" style={{ marginTop: 14 }}>
-        <div className="qa-strip">
-          <button className="qa-btn">
-            <div className="qa-icon" style={{ background: 'var(--n-blue-bg)', color: 'var(--n-blue-tx)' }}>
-              <CalendarPlus size={15} />
+      {/* ── Bento Grid ── */}
+      <section style={{ marginTop: 28 }}>
+        <div className="bento-grid">
+
+          {/* Calendar Widget (1x1) */}
+          <div className="card anim-in anim-in-d1" style={{ aspectRatio: '1', padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Calendar style={{ width: 14, height: 14, color: 'var(--ink-outline)' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-variant)' }}>Calendar</span>
+              </div>
+              <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-2px', lineHeight: 1, color: 'var(--ink)' }}>
+                {today.getDate()}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--error)', marginTop: 4 }}>
+                {monthNames[today.getMonth()]}
+              </div>
             </div>
-            <span className="qa-name">일정 추가</span>
-          </button>
-          <button className="qa-btn">
-            <div className="qa-icon" style={{ background: 'var(--n-green-bg)', color: 'var(--n-green-tx)' }}>
-              <Receipt size={15} />
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-variant)', marginBottom: 6 }}>
+                3 events today
+              </div>
+              <div style={{ height: 4, borderRadius: 9999, background: 'var(--surface-container)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: '65%', borderRadius: 9999, background: 'var(--tertiary)' }} />
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--ink-outline)', marginTop: 4 }}>Next: Team sync in 45m</div>
             </div>
-            <span className="qa-name">지출 기록</span>
-          </button>
-          <button className="qa-btn">
-            <div className="qa-icon" style={{ background: 'var(--n-purple-bg)', color: 'var(--n-purple-tx)' }}>
-              <FileText size={15} />
-            </div>
-            <span className="qa-name">메모</span>
-          </button>
-          <button className="qa-btn">
-            <div className="qa-icon" style={{ background: 'var(--n-gray-bg)', color: 'var(--n-gray-tx)' }}>
-              <Search size={15} />
-            </div>
-            <span className="qa-name">검색</span>
-          </button>
-        </div>
-      </section>
-
-      {/* ============ 인사이트 ============ */}
-      <section className="w-section anim a4">
-        <SectionHead
-          icon={<Sparkles size={10} style={{ color: 'var(--n-purple-tx)' }} />}
-          iconColor="var(--n-purple-tx)"
-          title="인사이트"
-          moreLabel="더보기"
-          href="/insights"
-        />
-        <div className="rail">
-          {insightsLoading && <LoadingSkeleton variant="card" />}
-          {insightsError && !insightsLoading && (
-            <ErrorState message={insightsError} />
-          )}
-          {!insightsLoading && !insightsError && (insights ?? []).slice(0, 3).map((insight) => (
-            <SlideCard
-              key={insight.id}
-              coverGradient={insight.coverColor}
-              coverTag={insight.category}
-              coverTagColor="rgba(0,0,0,0.6)"
-              title={insight.title}
-              desc={insight.description}
-              tags={insight.tags.slice(0, 2).map((tag) => ({ label: tag, className: 'n-tag gray' }))}
-              href="/insights"
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* ============ 웍스 ============ */}
-      <section className="w-section anim a5">
-        <SectionHead
-          icon={<Briefcase size={10} style={{ color: 'var(--n-blue-tx)' }} />}
-          iconColor="var(--n-blue-tx)"
-          title="웍스"
-          moreLabel="더보기"
-          href="/works"
-        />
-        <div className="rail">
-          {worksLoading && <LoadingSkeleton variant="card" />}
-          {worksError && !worksLoading && (
-            <ErrorState message={worksError} />
-          )}
-          {!worksLoading && !worksError && (works ?? []).slice(0, 3).map((work) => (
-            <SlideCard
-              key={work.id}
-              coverGradient={work.coverColor}
-              coverTag={work.category}
-              coverTagColor="rgba(0,0,0,0.6)"
-              title={work.title}
-              desc={work.description}
-              tags={[{ label: work.status === 'done' ? '완료' : work.status === 'progress' ? '진행중' : '대기', className: `n-status ${work.status}` }]}
-              href="/works"
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* ============ 태스크 ============ */}
-      <section className="w-section anim a6">
-        <SectionHead
-          icon={<CheckCircle2 size={10} style={{ color: 'var(--n-red-tx)' }} />}
-          iconColor="var(--n-red-tx)"
-          title="태스크"
-          moreLabel="전체"
-          href="/tasks"
-        />
-        {tasksLoading && <LoadingSkeleton variant="table" />}
-        {tasksError && !tasksLoading && <ErrorState message={tasksError} onRetry={refetchTasks} />}
-        {!tasksLoading && !tasksError && (
-          <DBTable
-            columns={[
-              { key: 'icon', icon: null, label: '', className: 'h-icon' },
-              { key: 'name', icon: <Type size={8} />, label: '이름', className: 'h-name' },
-              { key: 'tag', icon: <Tag size={8} />, label: '분류', className: 'h-prop' },
-              { key: 'date', icon: <Calendar size={8} />, label: '마감', className: 'h-date' },
-            ]}
-            rows={(tasks ?? []).slice(0, 5).map((task) => {
-              const dateStr = task.dueDate
-                ? `${new Date(task.dueDate).getMonth() + 1}/${new Date(task.dueDate).getDate()}`
-                : '';
-              const isOverdue = task.dueDate
-                ? new Date(task.dueDate).getTime() < Date.now() && !task.done
-                : false;
-              return {
-                key: task.id,
-                cells: [
-                  <div key="c" className={`db-chk${task.done ? ' done' : ''}`}>{task.done && <Check size={7} />}</div>,
-                  <div key="t" className={`db-title${task.done ? ' strike' : ''}`}>{task.title}</div>,
-                  <div key="p" className="db-prop"><span className={`n-tag ${task.categoryColor}`}>{task.category}</span></div>,
-                  <div key="d" className={`db-date${isOverdue ? ' warn' : ''}`}>{dateStr}</div>,
-                ],
-              };
-            })}
-          />
-        )}
-      </section>
-
-      {/* ============ 파이낸스 ============ */}
-      <section className="w-section anim a7">
-        <SectionHead
-          icon={<Banknote size={10} style={{ color: '#2a9d99' }} />}
-          iconColor="#2a9d99"
-          title="파이낸스"
-          moreLabel="더보기"
-          href="/finance"
-        />
-        {financeLoading && <LoadingSkeleton variant="table" />}
-        {financeError && !financeLoading && <ErrorState message={financeError} onRetry={refetchFinance} />}
-        {!financeLoading && !financeError && (
-          <DBTable
-            columns={[
-              { key: 'icon', icon: null, label: '', className: 'h-icon' },
-              { key: 'name', icon: <Type size={8} />, label: '클라이언트', className: 'h-name' },
-              { key: 'schedule', icon: <CalendarClock size={8} />, label: '예정', className: 'h-prop', width: 70 },
-              { key: 'amount', icon: <Coins size={8} />, label: '금액', className: 'h-date', width: 50 },
-            ]}
-            rows={(finance ?? []).slice(0, 4).map((entry) => {
-              const dateLabel = entry.date
-                ? `${new Date(entry.date).getMonth() + 1}/${new Date(entry.date).getDate()}`
-                : '예정일 미정';
-              const amountMan = Math.round(entry.amount / 10000);
-              return {
-                key: entry.id,
-                className: 'fin',
-                cells: [
-                  <div key="i" className="n-page-icon blue"><Building2 size={10} /></div>,
-                  <div key="t" className="db-title">{entry.client}</div>,
-                  <div key="p" className="db-prop"><span className={`n-tag ${entry.date ? 'green' : 'gray'}`}>{dateLabel}</span></div>,
-                  <div key="d" className="db-date db-amount">{amountMan}만</div>,
-                ],
-              };
-            })}
-            variant="finance"
-          />
-        )}
-      </section>
-
-      {/* ============ ADD SECTION ============ */}
-      <button className="add-section" onClick={() => setWidgetSheetOpen(true)}>
-        <Plus size={10} /> 위젯 섹션 추가
-      </button>
-
-      {/* ============ WIDGET BOTTOM SHEET ============ */}
-      <BottomSheet
-        open={widgetSheetOpen}
-        onClose={() => setWidgetSheetOpen(false)}
-        title="위젯 추가"
-      >
-        <div className="bs-opt" onClick={() => handleWidgetSelect('숫자 카드')}>
-          <div className="bs-icon" style={{ color: 'var(--n-blue-tx)' }}><Hash size={13} /></div>
-          <div><div className="bs-name">숫자 카드</div><div className="bs-desc">단일 메트릭 (합계, D-day, 카운트)</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('리스트')}>
-          <div className="bs-icon" style={{ color: 'var(--n-green-tx)' }}><List size={13} /></div>
-          <div><div className="bs-name">리스트</div><div className="bs-desc">체크박스 + 날짜 세로 목록</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('카드 슬라이드')}>
-          <div className="bs-icon" style={{ color: 'var(--n-purple-tx)' }}><Layers size={13} /></div>
-          <div><div className="bs-name">카드 슬라이드</div><div className="bs-desc">가로 스와이프 썸네일 카드</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('캘린더')}>
-          <div className="bs-icon" style={{ color: 'var(--n-blue-tx)' }}><Calendar size={13} /></div>
-          <div><div className="bs-name">캘린더</div><div className="bs-desc">월간 미니 캘린더 + 이벤트 도트</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('갤러리')}>
-          <div className="bs-icon" style={{ color: 'var(--n-orange-tx)' }}><Image size={13} /></div>
-          <div><div className="bs-name">갤러리</div><div className="bs-desc">2~3열 이미지 그리드</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('프로그레스')}>
-          <div className="bs-icon" style={{ color: 'var(--n-green-tx)' }}><Activity size={13} /></div>
-          <div><div className="bs-name">프로그레스</div><div className="bs-desc">원형/바 진행률 표시</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('퀵 액션')}>
-          <div className="bs-icon" style={{ color: 'var(--n-brown-tx)' }}><Zap size={13} /></div>
-          <div><div className="bs-name">퀵 액션</div><div className="bs-desc">원터치 바로가기 버튼</div></div>
-        </div>
-      </BottomSheet>
-
-      {/* ============ WIDGET ADDED TOAST ============ */}
-      {widgetAddedMsg && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'var(--n-ink)',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 500,
-            padding: '9px 18px',
-            borderRadius: 20,
-            zIndex: 200,
-            whiteSpace: 'nowrap',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-          }}
-        >
-          위젯이 추가되었습니다
-        </div>
-      )}
-
-      {/* ============ CONFIG BOTTOM SHEET ============ */}
-      <BottomSheet
-        open={configWidgetType !== null}
-        onClose={handleConfigClose}
-        title={configWidgetType ? `${configWidgetType} 설정` : ''}
-      >
-        {/* Back button rendered above the sheet content via absolute positioning workaround — injected as first child */}
-        <div style={{ position: 'absolute', top: 16, left: 16 }}>
-          <button
-            onClick={handleConfigBack}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 4,
-              display: 'flex',
-              alignItems: 'center',
-              color: 'var(--n-ink)',
-              opacity: 0.5,
-            }}
-          >
-            <ArrowLeft size={16} />
-          </button>
-        </div>
-
-        {/* DB 선택 */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--n-ink)', opacity: 0.5, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            DB 선택
           </div>
-          <div style={{ position: 'relative' }}>
-            <div
-              onClick={() => setDbDropdownOpen(v => !v)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '9px 12px',
-                border: '1px solid var(--n-border)',
-                borderRadius: 8,
-                background: 'var(--n-surface)',
-                cursor: 'pointer',
-                fontSize: 13,
-                color: 'var(--n-ink)',
-              }}
-            >
-              <span>{configDb}</span>
-              <ChevronDown size={13} style={{ opacity: 0.5 }} />
+
+          {/* Quick Stat Widget (1x1) */}
+          <div className="card anim-in anim-in-d2" style={{ aspectRatio: '1', padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ width: 36, height: 36, borderRadius: 'var(--r-md)', background: 'rgba(0, 103, 137, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <ListChecks style={{ width: 18, height: 18, color: 'var(--tertiary)' }} />
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-variant)' }}>
+                Pending
+              </div>
             </div>
-            {dbDropdownOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  left: 0,
-                  right: 0,
-                  background: 'var(--n-surface)',
-                  border: '1px solid var(--n-border)',
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                  zIndex: 10,
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-                }}
-              >
-                {DB_OPTIONS.map(opt => (
-                  <div
-                    key={opt}
-                    onClick={() => { setConfigDb(opt); setDbDropdownOpen(false); }}
-                    style={{
-                      padding: '9px 12px',
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      background: configDb === opt ? 'var(--n-blue-bg)' : 'transparent',
-                      color: configDb === opt ? 'var(--n-blue-tx)' : 'var(--n-ink)',
-                    }}
-                  >
-                    {opt}
+            <div>
+              <div style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1, color: 'var(--ink)' }}>
+                {TASKS.filter((t) => !t.done).length}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-variant)', marginTop: 4 }}>
+                tasks remaining
+              </div>
+            </div>
+          </div>
+
+          {/* Task List (2-col span) */}
+          <div className="card span-2 anim-in anim-in-d3" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 'var(--r-sm)', background: 'rgba(158, 66, 44, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap style={{ width: 14, height: 14, color: 'var(--error)' }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.2px' }}>Immediate Actions</span>
+              </div>
+              <span className="pill active" style={{ fontSize: 10 }}>{donePct}% DONE</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {TASKS.map((task) => (
+                <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className={`task-check${task.done ? ' checked' : ''}`}>
+                    {task.done && <Check />}
                   </div>
+                  <span style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    letterSpacing: '-0.2px',
+                    color: task.done ? 'var(--ink-outline)' : 'var(--ink)',
+                    textDecoration: task.done ? 'line-through' : 'none',
+                  }}>
+                    {task.title}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Insight Cards (2-col span, grid 2) */}
+          <div className="span-2 anim-in anim-in-d4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {/* Insight 1 */}
+            <div className="card" style={{ overflow: 'hidden', position: 'relative' }}>
+              <div style={{ height: 100, background: 'linear-gradient(135deg, #006789, #5acafe)', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 10, left: 10 }}>
+                  <span className="pill" style={{ background: 'rgba(255,255,255,0.25)', color: 'white', backdropFilter: 'blur(8px)' }}>AI</span>
+                </div>
+              </div>
+              <div style={{ padding: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px', lineHeight: 1.3 }}>
+                  Weekly Focus Report
+                </div>
+              </div>
+            </div>
+
+            {/* Insight 2 */}
+            <div className="card" style={{ overflow: 'hidden', position: 'relative' }}>
+              <div style={{ height: 100, background: 'linear-gradient(135deg, #9e422c, #fe8b70)', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 10, left: 10 }}>
+                  <span className="pill" style={{ background: 'rgba(255,255,255,0.25)', color: 'white', backdropFilter: 'blur(8px)' }}>Trend</span>
+                </div>
+              </div>
+              <div style={{ padding: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px', lineHeight: 1.3 }}>
+                  Productivity Insights
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress Widget (1x1) */}
+          <div className="card anim-in anim-in-d5" style={{ aspectRatio: '1', padding: 16, background: 'var(--tertiary)', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: 'none' }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Focus Time</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1 }}>+24%</div>
+              <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.7, marginTop: 4 }}>vs last week</div>
+              {/* Mini bar chart */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, marginTop: 12, height: 28 }}>
+                {[40, 65, 45, 70, 55, 80, 90].map((h, i) => (
+                  <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 2, background: `rgba(255,255,255,${i === 6 ? 1 : 0.35})` }} />
                 ))}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* 사이즈 선택 */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--n-ink)', opacity: 0.5, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            사이즈 선택
+          {/* Time Widget (1x1) */}
+          <div className="card anim-in anim-in-d5" style={{ aspectRatio: '1', padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock style={{ width: 14, height: 14, color: 'var(--ink-outline)' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-variant)' }}>Time</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1 }}>
+                4.5<span style={{ fontSize: 16, fontWeight: 600 }}>h</span>
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-variant)', marginTop: 4 }}>deep work today</div>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {SIZE_OPTIONS.map(size => (
-              <button
-                key={size}
-                onClick={() => setConfigSize(size)}
-                style={{
-                  flex: 1,
-                  padding: '8px 0',
-                  border: configSize === size ? '1.5px solid var(--n-blue-tx)' : '1px solid var(--n-border)',
-                  borderRadius: 20,
-                  background: configSize === size ? 'var(--n-blue-bg)' : 'var(--n-surface)',
-                  color: configSize === size ? 'var(--n-blue-tx)' : 'var(--n-ink)',
-                  fontSize: 13,
-                  fontWeight: configSize === size ? 600 : 400,
-                  cursor: 'pointer',
-                }}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-        </div>
 
-        {/* 완료 버튼 */}
-        <button
-          onClick={handleWidgetAdd}
-          style={{
-            width: '100%',
-            height: 44,
-            background: 'var(--n-ink)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 10,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          위젯 추가
-        </button>
-      </BottomSheet>
-    </>
+        </div>
+      </section>
+
+      {/* ── Memo Archive ── */}
+      <section style={{ marginTop: 32 }} className="anim-in anim-in-d5">
+        <div className="section-label">Memo Archive</div>
+        <div className="card" style={{ margin: '0 20px' }}>
+          {MEMOS.map((memo, idx) => (
+            <div key={memo.id} className="list-row" style={{ cursor: 'pointer' }}>
+              <div className="list-row-thumb" style={{ background: memo.color }} />
+              <div className="list-row-content">
+                <div className="list-row-title">{memo.title}</div>
+                <div className="list-row-subtitle">{memo.subtitle}</div>
+              </div>
+              <ChevronRight style={{ width: 18, height: 18, color: 'var(--ink-outline-variant)', flexShrink: 0 }} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Focus Areas ── */}
+      <section style={{ marginTop: 32 }} className="anim-in anim-in-d6">
+        <div className="section-label">Focus Areas</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '0 20px' }}>
+          {FOCUS_AREAS.map((area) => (
+            <div key={area.label} className="focus-tile">
+              <div className="focus-tile-icon" style={{ background: area.bg, color: area.color }}>
+                <area.icon />
+              </div>
+              <span className="focus-tile-label">{area.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── CTA Card ── */}
+      <section style={{ marginTop: 32 }} className="anim-in anim-in-d6">
+        <div className="cta-card">
+          <h3>Curate your<br />digital mind.</h3>
+          <button>Create New</button>
+        </div>
+      </section>
+
+      {/* spacer for bottom nav */}
+      <div style={{ height: 32 }} />
+
+      {/* ── FAB ── */}
+      <button className="fab">
+        <Plus />
+      </button>
+    </div>
   );
 }
