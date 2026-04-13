@@ -227,33 +227,22 @@ export default function HomePage() {
           href="/works"
         />
         <div className="rail">
-          <SlideCard
-            coverGradient="linear-gradient(135deg, #e1eef8, #cde0f5)"
-            coverTag="기획"
-            coverTagColor="var(--n-blue-tx)"
-            title="세븐플러스 K-art 기획안"
-            desc="기획 방향 1차 검토 완료. 피드백 반영 중."
-            tags={[{ label: '완료', className: 'n-status done' }]}
-            href="/works"
-          />
-          <SlideCard
-            coverGradient="linear-gradient(135deg, #fef0e4, #f5d9b8)"
-            coverTag="Video"
-            coverTagColor="var(--n-orange-tx)"
-            title="Magiclight 영상 대본"
-            desc="초안 전달 완료. 최종 게시 4/14~15 예정."
-            tags={[{ label: '진행중', className: 'n-status progress' }]}
-            href="/works"
-          />
-          <SlideCard
-            coverGradient="linear-gradient(135deg, #e6f5f4, #b8e0de)"
-            coverTag="강의"
-            coverTagColor="var(--n-green-tx)"
-            title="해커스 바이브코딩 커리큘럼"
-            desc="2차시 수정본 작업 중. 피봇 관련 논의 필요."
-            tags={[{ label: '진행중', className: 'n-status progress' }]}
-            href="/works"
-          />
+          {worksLoading && <LoadingSkeleton variant="card" />}
+          {worksError && !worksLoading && (
+            <ErrorState message={worksError} />
+          )}
+          {!worksLoading && !worksError && (works ?? []).slice(0, 3).map((work) => (
+            <SlideCard
+              key={work.id}
+              coverGradient={work.coverColor}
+              coverTag={work.category}
+              coverTagColor="rgba(0,0,0,0.6)"
+              title={work.title}
+              desc={work.description}
+              tags={[{ label: work.status === 'done' ? '완료' : work.status === 'progress' ? '진행중' : '대기', className: `n-status ${work.status}` }]}
+              href="/works"
+            />
+          ))}
         </div>
       </section>
 
@@ -266,61 +255,35 @@ export default function HomePage() {
           moreLabel="전체"
           href="/tasks"
         />
-        <DBTable
-          columns={[
-            { key: 'icon', icon: null, label: '', className: 'h-icon' },
-            { key: 'name', icon: <Type size={8} />, label: '이름', className: 'h-name' },
-            { key: 'tag', icon: <Tag size={8} />, label: '분류', className: 'h-prop' },
-            { key: 'date', icon: <Calendar size={8} />, label: '마감', className: 'h-date' },
-          ]}
-          rows={[
-            {
-              key: 't1',
-              cells: [
-                <div key="c" className="db-chk"></div>,
-                <div key="t" className="db-title">해커스 2차시 수정본 전달</div>,
-                <div key="p" className="db-prop"><span className="n-tag green">강의</span></div>,
-                <div key="d" className="db-date warn">4/8</div>,
-              ],
-            },
-            {
-              key: 't2',
-              cells: [
-                <div key="c" className="db-chk"></div>,
-                <div key="t" className="db-title">매직라이트 영상 업로드</div>,
-                <div key="p" className="db-prop"><span className="n-tag orange">Video</span></div>,
-                <div key="d" className="db-date warn">4/8</div>,
-              ],
-            },
-            {
-              key: 't3',
-              cells: [
-                <div key="c" className="db-chk"></div>,
-                <div key="t" className="db-title">Magiclight 영상 최종 게시</div>,
-                <div key="p" className="db-prop"><span className="n-tag orange">Video</span></div>,
-                <div key="d" className="db-date">4/14</div>,
-              ],
-            },
-            {
-              key: 't4',
-              cells: [
-                <div key="c" className="db-chk done"><Check size={7} /></div>,
-                <div key="t" className="db-title strike">세븐플러스 미팅</div>,
-                <div key="p" className="db-prop"><span className="n-tag gray">회의</span></div>,
-                <div key="d" className="db-date">4/10</div>,
-              ],
-            },
-            {
-              key: 't5',
-              cells: [
-                <div key="c" className="db-chk done"><Check size={7} /></div>,
-                <div key="t" className="db-title strike">RelayAX 마곡 미팅</div>,
-                <div key="p" className="db-prop"><span className="n-tag gray">회의</span></div>,
-                <div key="d" className="db-date">4/7</div>,
-              ],
-            },
-          ]}
-        />
+        {tasksLoading && <LoadingSkeleton variant="table" />}
+        {tasksError && !tasksLoading && <ErrorState message={tasksError} onRetry={refetchTasks} />}
+        {!tasksLoading && !tasksError && (
+          <DBTable
+            columns={[
+              { key: 'icon', icon: null, label: '', className: 'h-icon' },
+              { key: 'name', icon: <Type size={8} />, label: '이름', className: 'h-name' },
+              { key: 'tag', icon: <Tag size={8} />, label: '분류', className: 'h-prop' },
+              { key: 'date', icon: <Calendar size={8} />, label: '마감', className: 'h-date' },
+            ]}
+            rows={(tasks ?? []).slice(0, 5).map((task) => {
+              const dateStr = task.dueDate
+                ? `${new Date(task.dueDate).getMonth() + 1}/${new Date(task.dueDate).getDate()}`
+                : '';
+              const isOverdue = task.dueDate
+                ? new Date(task.dueDate).getTime() < Date.now() && !task.done
+                : false;
+              return {
+                key: task.id,
+                cells: [
+                  <div key="c" className={`db-chk${task.done ? ' done' : ''}`}>{task.done && <Check size={7} />}</div>,
+                  <div key="t" className={`db-title${task.done ? ' strike' : ''}`}>{task.title}</div>,
+                  <div key="p" className="db-prop"><span className={`n-tag ${task.categoryColor}`}>{task.category}</span></div>,
+                  <div key="d" className={`db-date${isOverdue ? ' warn' : ''}`}>{dateStr}</div>,
+                ],
+              };
+            })}
+          />
+        )}
       </section>
 
       {/* ============ 파이낸스 ============ */}
@@ -332,57 +295,35 @@ export default function HomePage() {
           moreLabel="더보기"
           href="/finance"
         />
-        <DBTable
-          columns={[
-            { key: 'icon', icon: null, label: '', className: 'h-icon' },
-            { key: 'name', icon: <Type size={8} />, label: '클라이언트', className: 'h-name' },
-            { key: 'schedule', icon: <CalendarClock size={8} />, label: '예정', className: 'h-prop', width: 70 },
-            { key: 'amount', icon: <Coins size={8} />, label: '금액', className: 'h-date', width: 50 },
-          ]}
-          rows={[
-            {
-              key: 'f1',
-              className: 'fin',
-              cells: [
-                <div key="i" className="n-page-icon blue"><Building2 size={10} /></div>,
-                <div key="t" className="db-title">아카데미</div>,
-                <div key="p" className="db-prop"><span className="n-tag green">4/14 (월)</span></div>,
-                <div key="d" className="db-date db-amount">200만</div>,
-              ],
-            },
-            {
-              key: 'f2',
-              className: 'fin',
-              cells: [
-                <div key="i" className="n-page-icon gray"><Building2 size={10} /></div>,
-                <div key="t" className="db-title">KCC정보통신</div>,
-                <div key="p" className="db-prop"><span className="n-tag gray">예정일 미정</span></div>,
-                <div key="d" className="db-date db-amount">150만</div>,
-              ],
-            },
-            {
-              key: 'f3',
-              className: 'fin',
-              cells: [
-                <div key="i" className="n-page-icon purple"><Building2 size={10} /></div>,
-                <div key="t" className="db-title">젠스파크</div>,
-                <div key="p" className="db-prop"><span className="n-tag gray">예정일 미정</span></div>,
-                <div key="d" className="db-date db-amount">110만</div>,
-              ],
-            },
-            {
-              key: 'f4',
-              className: 'fin',
-              cells: [
-                <div key="i" className="n-page-icon orange"><Building2 size={10} /></div>,
-                <div key="t" className="db-title">매직라이트</div>,
-                <div key="p" className="db-prop"><span className="n-tag gray">예정일 미정</span></div>,
-                <div key="d" className="db-date db-amount">70만</div>,
-              ],
-            },
-          ]}
-          variant="finance"
-        />
+        {financeLoading && <LoadingSkeleton variant="table" />}
+        {financeError && !financeLoading && <ErrorState message={financeError} onRetry={refetchFinance} />}
+        {!financeLoading && !financeError && (
+          <DBTable
+            columns={[
+              { key: 'icon', icon: null, label: '', className: 'h-icon' },
+              { key: 'name', icon: <Type size={8} />, label: '클라이언트', className: 'h-name' },
+              { key: 'schedule', icon: <CalendarClock size={8} />, label: '예정', className: 'h-prop', width: 70 },
+              { key: 'amount', icon: <Coins size={8} />, label: '금액', className: 'h-date', width: 50 },
+            ]}
+            rows={(finance ?? []).slice(0, 4).map((entry) => {
+              const dateLabel = entry.date
+                ? `${new Date(entry.date).getMonth() + 1}/${new Date(entry.date).getDate()}`
+                : '예정일 미정';
+              const amountMan = Math.round(entry.amount / 10000);
+              return {
+                key: entry.id,
+                className: 'fin',
+                cells: [
+                  <div key="i" className="n-page-icon blue"><Building2 size={10} /></div>,
+                  <div key="t" className="db-title">{entry.client}</div>,
+                  <div key="p" className="db-prop"><span className={`n-tag ${entry.date ? 'green' : 'gray'}`}>{dateLabel}</span></div>,
+                  <div key="d" className="db-date db-amount">{amountMan}만</div>,
+                ],
+              };
+            })}
+            variant="finance"
+          />
+        )}
       </section>
 
       {/* ============ ADD SECTION ============ */}
