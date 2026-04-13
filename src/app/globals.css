@@ -675,6 +675,11 @@ body {
   100% { transform: rotate(0.6deg); }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
 /* ============ ANIMATIONS ============ */
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }

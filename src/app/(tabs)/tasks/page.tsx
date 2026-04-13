@@ -1,42 +1,47 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle2, Type, Tag, Calendar, Check } from 'lucide-react';
+import { useNotionData } from '@/lib/hooks';
+import { Task } from '@/lib/types';
+import LoadingSkeleton from '@/components/LoadingSkeleton';
+import ErrorState from '@/components/ErrorState';
 
 type Filter = '전체' | '진행중' | '완료';
-
-interface Task {
-  id: string;
-  title: string;
-  category: string;
-  categoryColor: string;
-  date: string;
-  dateWarn: boolean;
-  done: boolean;
-}
-
-const INITIAL_TASKS: Task[] = [
-  { id: 't1', title: '해커스 2차시 수정본 전달', category: '강의', categoryColor: 'green', date: '4/8', dateWarn: true, done: false },
-  { id: 't2', title: '매직라이트 영상 업로드', category: 'Video', categoryColor: 'orange', date: '4/8', dateWarn: true, done: false },
-  { id: 't3', title: 'Magiclight 영상 최종 게시', category: 'Video', categoryColor: 'orange', date: '4/14', dateWarn: false, done: false },
-  { id: 't4', title: '프로젝트 A 기획서 검토', category: '기획', categoryColor: 'blue', date: '4/15', dateWarn: false, done: false },
-  { id: 't5', title: '디자인 시스템 정리', category: '디자인', categoryColor: 'purple', date: '4/16', dateWarn: false, done: false },
-  { id: 't6', title: '세븐플러스 미팅', category: '회의', categoryColor: 'gray', date: '4/10', dateWarn: false, done: true },
-  { id: 't7', title: 'RelayAX 마곡 미팅', category: '회의', categoryColor: 'gray', date: '4/7', dateWarn: false, done: true },
-  { id: 't8', title: 'Notion DB 연동 범위 확정', category: '기획', categoryColor: 'blue', date: '4/5', dateWarn: false, done: true },
-];
 
 const FILTERS: Filter[] = ['전체', '진행중', '완료'];
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const { data, loading, error, isMock, refetch } = useNotionData<Task[]>('tasks');
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<Filter>('전체');
 
-  function toggleTask(id: string) {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
-  }
+  useEffect(() => {
+    if (data) setTasks(data);
+  }, [data]);
+
+  const toggleTask = async (id: string) => {
+    const prev = [...tasks];
+    const target = prev.find((t) => t.id === id);
+    if (!target) return;
+    const newDone = !target.done;
+
+    setTasks((t) => t.map((task) => (task.id === id ? { ...task, done: newDone } : task)));
+
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, done: newDone }),
+      });
+      if (!res.ok) throw new Error('Failed');
+    } catch {
+      setTasks(prev); // revert on failure
+    }
+  };
+
+  if (loading) return <LoadingSkeleton variant="table" />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
 
   const undoneCount = tasks.filter((t) => !t.done).length;
   const doneCount = tasks.filter((t) => t.done).length;
@@ -51,6 +56,20 @@ export default function TasksPage() {
 
   return (
     <>
+      {/* ============ MOCK BANNER ============ */}
+      {isMock && (
+        <div
+          style={{
+            padding: '4px 20px',
+            fontSize: 10,
+            color: 'var(--n-ink-45)',
+            letterSpacing: '-0.05px',
+          }}
+        >
+          Mock 데이터
+        </div>
+      )}
+
       {/* ============ HEADER ============ */}
       <div className="hdr">
         <div className="hdr-topline">
@@ -148,8 +167,8 @@ export default function TasksPage() {
               <div className="db-prop">
                 <span className={`n-tag ${task.categoryColor}`}>{task.category}</span>
               </div>
-              <div className={`db-date${task.dateWarn && !task.done ? ' warn' : ''}`}>
-                {task.date}
+              <div className="db-date">
+                {task.dueDate ?? '—'}
               </div>
             </div>
           ))}

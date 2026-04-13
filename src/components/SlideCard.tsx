@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 interface SlideCardProps {
   coverGradient: string;
   coverTag: string;
@@ -5,6 +7,7 @@ interface SlideCardProps {
   title: string;
   desc: string;
   tags: { label: string; className: string }[];
+  href?: string;
 }
 
 export default function SlideCard({
@@ -14,8 +17,9 @@ export default function SlideCard({
   title,
   desc,
   tags,
+  href,
 }: SlideCardProps) {
-  return (
+  const content = (
     <div className="n-card">
       <div className="n-card-cover" style={{ background: coverGradient }}>
         <span className="cover-tag" style={{ color: coverTagColor }}>
@@ -33,4 +37,14 @@ export default function SlideCard({
       </div>
     </div>
   );
+
+  if (href) {
+    return (
+      <Link href={href} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }

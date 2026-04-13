@@ -40,6 +40,10 @@ import MetricCard from '@/components/MetricCard';
 import SlideCard from '@/components/SlideCard';
 import DBTable from '@/components/DBTable';
 import BottomSheet from '@/components/BottomSheet';
+import LoadingSkeleton from '@/components/LoadingSkeleton';
+import ErrorState from '@/components/ErrorState';
+import { useNotionData } from '@/lib/hooks';
+import type { Task, FinanceEntry, Insight, Work } from '@/lib/types';
 
 const DB_OPTIONS = ['Beyond_Tasks', '타임라인(가계부)', '예정 수입/지출', 'Insights', 'Works'];
 const SIZE_OPTIONS = ['Small', 'Medium', 'Large'];
@@ -50,6 +54,28 @@ export default function HomePage() {
   const [configDb, setConfigDb] = useState(DB_OPTIONS[0]);
   const [configSize, setConfigSize] = useState('Medium');
   const [dbDropdownOpen, setDbDropdownOpen] = useState(false);
+  const [widgetAddedMsg, setWidgetAddedMsg] = useState(false);
+
+  const { data: tasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useNotionData<Task[]>('tasks');
+  const { data: finance, loading: financeLoading, error: financeError, refetch: refetchFinance } = useNotionData<FinanceEntry[]>('finance');
+  const { data: insights, loading: insightsLoading, error: insightsError } = useNotionData<Insight[]>('insights');
+  const { data: works, loading: worksLoading, error: worksError } = useNotionData<Work[]>('works');
+
+  // Metric calculations
+  const incomeTotal = finance
+    ? finance.filter((f) => f.type === 'income').reduce((sum, f) => sum + f.amount, 0)
+    : 0;
+  const incomeMan = Math.round(incomeTotal / 10000);
+
+  const undoneTasks = tasks ? tasks.filter((t) => !t.done) : [];
+  const undoneCount = undoneTasks.length;
+
+  const dDay = tasks
+    ? tasks
+        .filter((t) => !t.done && t.dueDate)
+        .map((t) => Math.ceil((new Date(t.dueDate!).getTime() - Date.now()) / 86400000))
+        .sort((a, b) => a - b)[0] ?? 0
+    : 0;
 
   function handleWidgetSelect(type: string) {
     setWidgetSheetOpen(false);
@@ -71,8 +97,9 @@ export default function HomePage() {
   }
 
   function handleWidgetAdd() {
-    console.log({ type: configWidgetType, db: configDb, size: configSize });
     handleConfigClose();
+    setWidgetAddedMsg(true);
+    setTimeout(() => setWidgetAddedMsg(false), 2000);
   }
 
   return (
@@ -93,38 +120,42 @@ export default function HomePage() {
 
       {/* ============ METRICS ============ */}
       <section className="w-section anim a2" style={{ marginTop: 18 }}>
-        <div className="metric-strip">
-          <MetricCard
-            accent="#2a9d99"
-            icon={<ArrowDownToLine size={11} />}
-            iconColor="teal"
-            label="예정 수입"
-            value={530}
-            unit="만원"
-            valueColor="teal"
-            sub={<><ArrowUpRight size={8} /> 4건 대기</>}
-          />
-          <MetricCard
-            accent="var(--n-red-tx)"
-            icon={<Timer size={11} />}
-            iconColor="red"
-            label="D-Day"
-            value={3}
-            unit="일"
-            valueColor="red"
-            sub={<><Flag size={8} /> 매직라이트 게시</>}
-          />
-          <MetricCard
-            accent="var(--n-orange-tx)"
-            icon={<AlertCircle size={11} />}
-            iconColor="orange"
-            label="미완료"
-            value={2}
-            unit="건"
-            valueColor="orange"
-            sub={<><Clock3 size={8} /> 마감 지연</>}
-          />
-        </div>
+        {(tasksLoading || financeLoading) ? (
+          <LoadingSkeleton variant="metric" />
+        ) : (
+          <div className="metric-strip">
+            <MetricCard
+              accent="#2a9d99"
+              icon={<ArrowDownToLine size={11} />}
+              iconColor="teal"
+              label="예정 수입"
+              value={incomeMan}
+              unit="만원"
+              valueColor="teal"
+              sub={<><ArrowUpRight size={8} /> {finance ? finance.filter((f) => f.type === 'income').length : 0}건 대기</>}
+            />
+            <MetricCard
+              accent="var(--n-red-tx)"
+              icon={<Timer size={11} />}
+              iconColor="red"
+              label="D-Day"
+              value={dDay}
+              unit="일"
+              valueColor="red"
+              sub={<><Flag size={8} /> 최근 마감</>}
+            />
+            <MetricCard
+              accent="var(--n-orange-tx)"
+              icon={<AlertCircle size={11} />}
+              iconColor="orange"
+              label="미완료"
+              value={undoneCount}
+              unit="건"
+              valueColor="orange"
+              sub={<><Clock3 size={8} /> 마감 지연</>}
+            />
+          </div>
+        )}
       </section>
 
       {/* ============ QUICK ACTIONS ============ */}
@@ -164,41 +195,25 @@ export default function HomePage() {
           iconColor="var(--n-purple-tx)"
           title="인사이트"
           moreLabel="더보기"
+          href="/insights"
         />
         <div className="rail">
-          <SlideCard
-            coverGradient="linear-gradient(135deg, #ebe4f7, #d4c6ec)"
-            coverTag="AI"
-            coverTagColor="var(--n-purple-tx)"
-            title="Google Gemma 4 출시 분석"
-            desc="Apache 2.0 라이선스, OpenClaw 공식 지원 확정. MoE 26B 활성 파라미터 3.8B로 에이전트 최적화."
-            tags={[
-              { label: '오픈소스', className: 'n-tag purple' },
-              { label: '4/5', className: 'n-tag gray' },
-            ]}
-          />
-          <SlideCard
-            coverGradient="linear-gradient(135deg, #fde8e8, #f5c4c4)"
-            coverTag="Policy"
-            coverTagColor="var(--n-red-tx)"
-            title="Anthropic 4/4 정책 변경"
-            desc="Claude Pro/Max 구독 third-party 에이전트 차단. API 키 또는 Extra Usage 과금 전환."
-            tags={[
-              { label: '긴급', className: 'n-tag red' },
-              { label: '4/4', className: 'n-tag gray' },
-            ]}
-          />
-          <SlideCard
-            coverGradient="linear-gradient(135deg, #e1eef8, #b8d4f0)"
-            coverTag="Design"
-            coverTagColor="var(--n-blue-tx)"
-            title="awesome-design-md 35K stars"
-            desc="10일 만에 GitHub 역대 최속 awesome 리스트. DESIGN.md 컨벤션이 새 표준으로 부상."
-            tags={[
-              { label: '트렌드', className: 'n-tag blue' },
-              { label: '4/9', className: 'n-tag gray' },
-            ]}
-          />
+          {insightsLoading && <LoadingSkeleton variant="card" />}
+          {insightsError && !insightsLoading && (
+            <ErrorState message={insightsError} />
+          )}
+          {!insightsLoading && !insightsError && (insights ?? []).slice(0, 3).map((insight) => (
+            <SlideCard
+              key={insight.id}
+              coverGradient={insight.coverColor}
+              coverTag={insight.category}
+              coverTagColor="rgba(0,0,0,0.6)"
+              title={insight.title}
+              desc={insight.description}
+              tags={insight.tags.slice(0, 2).map((tag) => ({ label: tag, className: 'n-tag gray' }))}
+              href="/insights"
+            />
+          ))}
         </div>
       </section>
 
@@ -209,6 +224,7 @@ export default function HomePage() {
           iconColor="var(--n-blue-tx)"
           title="웍스"
           moreLabel="더보기"
+          href="/works"
         />
         <div className="rail">
           <SlideCard
@@ -218,6 +234,7 @@ export default function HomePage() {
             title="세븐플러스 K-art 기획안"
             desc="기획 방향 1차 검토 완료. 피드백 반영 중."
             tags={[{ label: '완료', className: 'n-status done' }]}
+            href="/works"
           />
           <SlideCard
             coverGradient="linear-gradient(135deg, #fef0e4, #f5d9b8)"
@@ -226,6 +243,7 @@ export default function HomePage() {
             title="Magiclight 영상 대본"
             desc="초안 전달 완료. 최종 게시 4/14~15 예정."
             tags={[{ label: '진행중', className: 'n-status progress' }]}
+            href="/works"
           />
           <SlideCard
             coverGradient="linear-gradient(135deg, #e6f5f4, #b8e0de)"
@@ -234,6 +252,7 @@ export default function HomePage() {
             title="해커스 바이브코딩 커리큘럼"
             desc="2차시 수정본 작업 중. 피봇 관련 논의 필요."
             tags={[{ label: '진행중', className: 'n-status progress' }]}
+            href="/works"
           />
         </div>
       </section>
@@ -245,6 +264,7 @@ export default function HomePage() {
           iconColor="var(--n-red-tx)"
           title="태스크"
           moreLabel="전체"
+          href="/tasks"
         />
         <DBTable
           columns={[
@@ -310,6 +330,7 @@ export default function HomePage() {
           iconColor="#2a9d99"
           title="파이낸스"
           moreLabel="더보기"
+          href="/finance"
         />
         <DBTable
           columns={[
@@ -404,6 +425,29 @@ export default function HomePage() {
           <div><div className="bs-name">퀵 액션</div><div className="bs-desc">원터치 바로가기 버튼</div></div>
         </div>
       </BottomSheet>
+
+      {/* ============ WIDGET ADDED TOAST ============ */}
+      {widgetAddedMsg && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'var(--n-ink)',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 500,
+            padding: '9px 18px',
+            borderRadius: 20,
+            zIndex: 200,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+          }}
+        >
+          위젯이 추가되었습니다
+        </div>
+      )}
 
       {/* ============ CONFIG BOTTOM SHEET ============ */}
       <BottomSheet

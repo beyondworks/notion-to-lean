@@ -1,0 +1,21 @@
+{
+  "name": "Beyondworks",
+  "short_name": "Beyondworks",
+  "description": "Notion 워크스페이스를 모바일 위젯 대시보드로",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f6f3",
+  "theme_color": "#f7f6f3",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

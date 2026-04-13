@@ -3,83 +3,13 @@
 import { useState } from 'react';
 import { ArrowLeft, Briefcase } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useNotionData } from '@/lib/hooks';
+import type { Work } from '@/lib/types';
+import LoadingSkeleton from '@/components/LoadingSkeleton';
+import ErrorState from '@/components/ErrorState';
 
 type Status = 'done' | 'progress' | 'todo';
 type FilterKey = '전체' | '진행중' | '완료' | '대기';
-
-interface WorkCard {
-  id: number;
-  title: string;
-  category: string;
-  coverGradient: string;
-  coverTagColor: string;
-  desc: string;
-  status: Status;
-  statusLabel: string;
-}
-
-const CARDS: WorkCard[] = [
-  {
-    id: 1,
-    title: '세븐플러스 K-art 기획안',
-    category: '기획',
-    coverGradient: 'linear-gradient(135deg, #e7f3f8 0%, #b8d9ec 100%)',
-    coverTagColor: 'var(--n-blue-tx)',
-    desc: '기획 방향 1차 검토 완료',
-    status: 'done',
-    statusLabel: '완료',
-  },
-  {
-    id: 2,
-    title: 'Magiclight 영상 대본',
-    category: 'Video',
-    coverGradient: 'linear-gradient(135deg, #fbecdd 0%, #f5c897 100%)',
-    coverTagColor: 'var(--n-orange-tx)',
-    desc: '초안 전달 완료',
-    status: 'progress',
-    statusLabel: '진행중',
-  },
-  {
-    id: 3,
-    title: '해커스 바이브코딩',
-    category: '강의',
-    coverGradient: 'linear-gradient(135deg, #edf3ec 0%, #b2d9b5 100%)',
-    coverTagColor: 'var(--n-green-tx)',
-    desc: '2차시 수정본 작업 중',
-    status: 'progress',
-    statusLabel: '진행중',
-  },
-  {
-    id: 4,
-    title: 'Notion-to-Lean 허브',
-    category: '개발',
-    coverGradient: 'linear-gradient(135deg, #f4f0f7 0%, #d5c0e8 100%)',
-    coverTagColor: 'var(--n-purple-tx)',
-    desc: '프로토타입 구축 중',
-    status: 'progress',
-    statusLabel: '진행중',
-  },
-  {
-    id: 5,
-    title: '브랜드 가이드라인',
-    category: '디자인',
-    coverGradient: 'linear-gradient(135deg, #f9eef3 0%, #edb3d0 100%)',
-    coverTagColor: 'var(--n-pink-tx)',
-    desc: '초안 작성 대기',
-    status: 'todo',
-    statusLabel: '대기',
-  },
-  {
-    id: 6,
-    title: '투자 IR 자료',
-    category: '비즈니스',
-    coverGradient: 'linear-gradient(135deg, #f4eeee 0%, #ddb89e 100%)',
-    coverTagColor: 'var(--n-brown-tx)',
-    desc: '2차 라운드 준비',
-    status: 'todo',
-    statusLabel: '대기',
-  },
-];
 
 const FILTER_STATUS_MAP: Record<FilterKey, Status | null> = {
   전체: null,
@@ -88,16 +18,23 @@ const FILTER_STATUS_MAP: Record<FilterKey, Status | null> = {
   대기: 'todo',
 };
 
+const STATUS_LABEL: Record<Status, string> = {
+  done: '완료',
+  progress: '진행중',
+  todo: '대기',
+};
+
 const FILTERS: FilterKey[] = ['전체', '진행중', '완료', '대기'];
 
 export default function WorksPage() {
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<FilterKey>('전체');
+  const { data: works, loading, error, refetch } = useNotionData<Work[]>('works');
 
   const filtered =
     FILTER_STATUS_MAP[activeFilter] === null
-      ? CARDS
-      : CARDS.filter((c) => c.status === FILTER_STATUS_MAP[activeFilter]);
+      ? (works ?? [])
+      : (works ?? []).filter((c) => c.status === FILTER_STATUS_MAP[activeFilter]);
 
   return (
     <div style={{ paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}>
@@ -188,7 +125,17 @@ export default function WorksPage() {
           padding: '14px 20px 0',
         }}
       >
-        {filtered.map((card, i) => (
+        {loading && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <LoadingSkeleton variant="table" />
+          </div>
+        )}
+        {error && !loading && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <ErrorState message={error} onRetry={refetch} />
+          </div>
+        )}
+        {!loading && !error && filtered.map((card, i) => (
           <div
             key={card.id}
             className={`n-card anim a${Math.min(i + 1, 7)}`}
@@ -198,13 +145,13 @@ export default function WorksPage() {
             <div
               className="n-card-cover"
               style={{
-                background: card.coverGradient,
+                background: card.coverColor,
                 height: 64,
               }}
             >
               <span
                 className="cover-tag"
-                style={{ color: card.coverTagColor }}
+                style={{ color: 'rgba(0,0,0,0.6)' }}
               >
                 {card.category}
               </span>
@@ -223,13 +170,13 @@ export default function WorksPage() {
                 overflow: 'hidden',
               }}
             >
-              {card.desc}
+              {card.description}
             </div>
 
             {/* Status */}
             <div className="n-card-tags">
               <span className={`n-status ${card.status}`}>
-                {card.statusLabel}
+                {STATUS_LABEL[card.status]}
               </span>
             </div>
           </div>

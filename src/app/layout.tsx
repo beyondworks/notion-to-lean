@@ -11,6 +11,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Beyondworks",
   description: "Notion 워크스페이스를 모바일 위젯 대시보드로",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -23,6 +24,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   userScalable: false,
+  themeColor: "#f7f6f3",
 };
 
 export default function RootLayout({
