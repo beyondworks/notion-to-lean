@@ -24,6 +24,15 @@ export const DB_IDS = {
   SCHEDULED_FINANCE: '15007d59-2e5f-4b88-85a3-95fb4c77b90a',
   INSIGHTS: '241003c7-f7be-800b-b71c-df3acddc5bb8',
   WORKS: '241003c7-f7be-8011-8ba4-cecf131df2a0',
+  PARENT_TASK: '242003c7-f7be-806b-a177-e8372eaa64a4',
+  // Insights sub-DBs
+  INSIGHTS_AI: '241003c7-f7be-800f-8f07-f95918c3a072',
+  INSIGHTS_CLAUDE_CODE: '2fd003c7-f7be-80cb-90d3-dbecc15c507f',
+  INSIGHTS_SCRAP: '247003c7-f7be-80c0-a9f4-cddbcd337415',
+  INSIGHTS_DESIGN: '241003c7-f7be-804f-a021-fc24777ca9ad',
+  INSIGHTS_BRANDING: '247003c7-f7be-803a-83f5-fd9494d24d62',
+  INSIGHTS_BUILD: '247003c7-f7be-8074-a583-e1638fd3cfed',
+  INSIGHTS_MARKETING: '247003c7-f7be-8035-83f4-d39480d66503',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -38,18 +47,31 @@ export async function queryDatabase(
   filter?: Record<string, unknown>,
   sorts?: Array<Record<string, unknown>>,
 ): Promise<any[]> {
-  if (!notionClient) return [];
+  if (!apiKey) return [];
 
-  const params: Record<string, unknown> = { data_source_id: dbId };
-  if (filter) params.filter = filter;
-  if (sorts) params.sorts = sorts;
+  // Use REST API directly — SDK v5's dataSources.query hits a different endpoint
+  const body: Record<string, unknown> = {};
+  if (filter) body.filter = filter;
+  if (sorts) body.sorts = sorts;
+  body.page_size = 100;
 
-  // @notionhq/client v5.17 types expose query on dataSources but TS inference
-  // sometimes fails depending on the declaration map. Use `any` cast for safety.
-  const queryFn = (notionClient as any).dataSources?.query ?? (notionClient as any).databases?.query;
-  if (!queryFn) return [];
-  const response = await queryFn(params);
-  return response.results;
+  const res = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Notion query failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.results ?? [];
 }
 
 /**
@@ -166,4 +188,62 @@ export function getPropertyValueMulti(
  */
 export function pageUrl(pageId: string): string {
   return `https://notion.so/${pageId.replace(/-/g, '')}`;
+}
+
+// ---------------------------------------------------------------------------
+// CRUD helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a new page in a database.
+ */
+export async function createPage(dbId: string, properties: Record<string, unknown>): Promise<string | null> {
+  if (!notionClient) return null;
+  const response = await (notionClient as any).pages.create({
+    parent: { database_id: dbId },
+    properties,
+  });
+  return response.id;
+}
+
+/**
+ * Archive (soft-delete) a page.
+ */
+export async function archivePage(pageId: string): Promise<void> {
+  if (!notionClient) return;
+  await (notionClient as any).pages.update({
+    page_id: pageId,
+    archived: true,
+  });
+}
+
+/**
+ * Get page blocks (content).
+ */
+export async function getPageBlocks(pageId: string): Promise<any[]> {
+  if (!notionClient) return [];
+  const response = await (notionClient as any).blocks.children.list({
+    block_id: pageId,
+    page_size: 100,
+  });
+  return response.results;
+}
+
+/**
+ * Append blocks to a page.
+ */
+export async function appendBlocks(pageId: string, children: any[]): Promise<void> {
+  if (!notionClient) return;
+  await (notionClient as any).blocks.children.append({
+    block_id: pageId,
+    children,
+  });
+}
+
+/**
+ * Get a single page.
+ */
+export async function getPage(pageId: string): Promise<any | null> {
+  if (!notionClient) return null;
+  return await (notionClient as any).pages.retrieve({ page_id: pageId });
 }

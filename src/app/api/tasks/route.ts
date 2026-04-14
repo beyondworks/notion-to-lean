@@ -4,6 +4,7 @@ import {
   isNotionEnabled,
   queryDatabase,
   updatePage,
+  createPage,
   getPropertyValueMulti,
   pageUrl,
   DB_IDS,
@@ -34,10 +35,10 @@ function mapNotionColor(color?: string): string {
 // Map a Notion page -> Task
 // ---------------------------------------------------------------------------
 function pageToTask(page: any): Task {
-  const title = getPropertyValueMulti(page, ['Name', '이름', 'Title', '제목', '태스크'], 'title');
+  const title = getPropertyValueMulti(page, ['Entry name', 'Name', '이름', 'Title', '제목', '태스크'], 'title');
   const selectVal = getPropertyValueMulti(page, ['Category', '분류', '카테고리', 'Type', '유형'], 'select');
-  const done = getPropertyValueMulti(page, ['Done', '완료', 'Checkbox', '체크박스', 'Status Check'], 'checkbox');
-  const dueDate = getPropertyValueMulti(page, ['Due', '마감', 'Date', '날짜', '마감일', 'Due Date'], 'date');
+  const done = getPropertyValueMulti(page, ['Completed', 'Done', '완료', 'Checkbox', '체크박스', 'Status Check'], 'checkbox');
+  const dueDate = getPropertyValueMulti(page, ['Date', 'Due', '마감', '날짜', '마감일', 'Due Date'], 'date');
 
   return {
     id: page.id,
@@ -60,7 +61,7 @@ export async function GET() {
 
   try {
     const pages = await queryDatabase(DB_IDS.TASKS, undefined, [
-      { property: 'Done', direction: 'ascending' } as any,
+      { property: 'Completed', direction: 'ascending' } as any,
     ]);
     const data: Task[] = pages.map(pageToTask);
     return NextResponse.json({ data, mock: false });
@@ -71,16 +72,55 @@ export async function GET() {
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/tasks  — toggle done checkbox
+// POST /api/tasks  — action: 'toggle' (default) | 'create'
 // ---------------------------------------------------------------------------
 export async function POST(request: Request) {
-  let body: { id?: string; done?: boolean };
+  let body: { action?: string; id?: string; done?: boolean; title?: string; properties?: Record<string, unknown> };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
+  const action = body.action ?? 'toggle';
+
+  // ---- CREATE ----
+  if (action === 'create') {
+    if (typeof body.title !== 'string' || !body.title.trim()) {
+      return NextResponse.json({ error: 'title is required for create action' }, { status: 400 });
+    }
+
+    if (!isNotionEnabled()) {
+      const mockId = `mock-task-${Date.now()}`;
+      return NextResponse.json(
+        { id: mockId, url: `https://notion.so/${mockId}`, mock: true },
+        { status: 201 },
+      );
+    }
+
+    try {
+      const properties: Record<string, unknown> = {
+        ...(body.properties ?? {}),
+        Name: { title: [{ text: { content: body.title } }] },
+      };
+
+      const pageId = await createPage(DB_IDS.TASKS, properties);
+      if (!pageId) {
+        return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
+      }
+
+      return NextResponse.json(
+        { id: pageId, url: pageUrl(pageId), mock: false },
+        { status: 201 },
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[tasks create]', message);
+      return NextResponse.json({ error: 'Failed to create task', detail: message }, { status: 500 });
+    }
+  }
+
+  // ---- TOGGLE (default) ----
   if (typeof body.id !== 'string' || typeof body.done !== 'boolean') {
     return NextResponse.json(
       { error: 'Body must include { id: string, done: boolean }' },

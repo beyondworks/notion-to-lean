@@ -50,7 +50,7 @@ const DEFAULT_GRADIENT = 'linear-gradient(135deg, #e5e7eb 0%, #9ca3af 100%)';
 function pageToWork(page: any): Work {
   const title = getPropertyValueMulti(
     page,
-    ['Name', '이름', 'Title', '제목'],
+    ['Entry name', 'Name', '이름', 'Title', '제목'],
     'title',
   );
 

@@ -1,6 +1,40 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 
+export function useMutation<TInput, TOutput = any>(
+  endpoint: string,
+  method: 'POST' | 'PATCH' | 'DELETE' = 'POST'
+) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutate = useCallback(async (data?: TInput): Promise<TOutput | null> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/${endpoint}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: data ? JSON.stringify(data) : undefined,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed: ${res.status}`);
+      }
+      const result = await res.json();
+      return result as TOutput;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      setError(msg);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [endpoint, method]);
+
+  return { mutate, loading, error };
+}
+
 interface UseNotionDataResult<T> {
   data: T | null;
   loading: boolean;

@@ -2,25 +2,29 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, CheckSquare, Wallet } from 'lucide-react';
+import { Home, LayoutGrid, Search, User } from 'lucide-react';
 
 const TABS = [
   { href: '/', label: 'Home', Icon: Home },
+  { href: '/tasks', label: 'Widgets', Icon: LayoutGrid },
   { href: '/search', label: 'Search', Icon: Search },
-  { href: '/tasks', label: 'Tasks', Icon: CheckSquare },
-  { href: '/finance', label: 'Finance', Icon: Wallet },
+  { href: '/finance', label: 'Profile', Icon: User },
 ] as const;
 
 export default function TabBar() {
   const pathname = usePathname();
 
   return (
-    <nav className="tabs">
+    <nav className="bottom-nav">
       {TABS.map(({ href, label, Icon }) => {
         const isActive = pathname === href;
         return (
-          <Link key={href} href={href} className={`tab-i${isActive ? ' on' : ''}`}>
-            <Icon size={14} />
+          <Link
+            key={href}
+            href={href}
+            className={`bottom-nav-item${isActive ? ' active' : ''}`}
+          >
+            <Icon />
             {label}
           </Link>
         );

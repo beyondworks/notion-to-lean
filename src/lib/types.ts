@@ -25,6 +25,7 @@ export interface Insight {
   coverColor: string;
   tags: string[];
   date: string | null;
+  lastEditedAt?: string;
   notionUrl?: string;
 }
 
@@ -44,4 +45,34 @@ export interface SearchResult {
   type: 'task' | 'insight' | 'work' | 'finance';
   icon: string;
   url: string;
+}
+
+export interface CreatePageParams {
+  dbId: string;
+  title: string;
+  properties?: Record<string, unknown>;
+}
+
+export interface UpdatePageParams {
+  pageId: string;
+  properties: Record<string, unknown>;
+}
+
+export interface PageBlock {
+  id: string;
+  type: string;
+  content: string;
+  checked?: boolean; // for to_do blocks
+}
+
+export interface PageDetail {
+  id: string;
+  title: string;
+  cover?: string | null;
+  icon?: string | null;
+  properties: Record<string, any>;
+  blocks: PageBlock[];
+  notionUrl: string;
+  lastEditedAt: string;
+  lastEditedBy: string;
 }

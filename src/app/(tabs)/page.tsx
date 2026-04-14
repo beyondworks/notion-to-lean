@@ -1,525 +1,710 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-  Lightbulb,
-  ArrowDownToLine,
-  ArrowUpRight,
-  Timer,
-  Flag,
-  AlertCircle,
-  Clock3,
-  CalendarPlus,
-  Receipt,
-  FileText,
-  Search,
-  Sparkles,
-  Briefcase,
-  CheckCircle2,
-  Type,
-  Tag,
+  LayoutGrid,
+  User,
   Calendar,
-  Banknote,
-  CalendarClock,
-  Coins,
+  ListChecks,
   Check,
+  ChevronRight,
   Plus,
-  Hash,
-  List,
-  Layers,
-  Image,
-  Activity,
+  Palette,
+  Briefcase,
+  Wallet,
+  Lightbulb,
+  Clock,
   Zap,
-  Building2,
-  ArrowLeft,
-  ChevronDown,
 } from 'lucide-react';
-import Header from '@/components/Header';
-import SectionHead from '@/components/SectionHead';
-import MetricCard from '@/components/MetricCard';
-import SlideCard from '@/components/SlideCard';
-import DBTable from '@/components/DBTable';
-import BottomSheet from '@/components/BottomSheet';
-import LoadingSkeleton from '@/components/LoadingSkeleton';
-import ErrorState from '@/components/ErrorState';
-import { useNotionData } from '@/lib/hooks';
-import type { Task, FinanceEntry, Insight, Work } from '@/lib/types';
+import { useNotionData, useMutation } from '@/lib/hooks';
+import type { Task, Insight, FinanceEntry, Work } from '@/lib/types';
+import CreateSheet from '@/components/CreateSheet';
+import { useToast } from '@/components/Toast';
 
-const DB_OPTIONS = ['Beyond_Tasks', '타임라인(가계부)', '예정 수입/지출', 'Insights', 'Works'];
-const SIZE_OPTIONS = ['Small', 'Medium', 'Large'];
+type TaskFilter = '오늘' | '이번 주' | '지연' | '완료';
+type SheetTab = 'task' | 'memo' | 'project' | 'expense';
+
+interface WeeklyMetrics {
+  thisWeekDone: number;
+  lastWeekDone: number;
+  dailyDone: number[];
+  todayDone: number;
+  urgentCount: number;
+  pendingCount: number;
+}
+
+const CATEGORY_COLORS: Record<string, { bg: string; tx: string }> = {
+  gray: { bg: 'var(--surface-container)', tx: 'var(--ink-variant)' },
+  blue: { bg: 'rgba(0,103,137,0.1)', tx: '#006789' },
+  green: { bg: 'rgba(68,131,97,0.1)', tx: '#448361' },
+  orange: { bg: 'rgba(217,115,13,0.1)', tx: '#d9730d' },
+  red: { bg: 'rgba(158,66,44,0.1)', tx: '#9e422c' },
+  purple: { bg: 'rgba(144,101,176,0.1)', tx: '#9065b0' },
+  pink: { bg: 'rgba(193,76,138,0.1)', tx: '#c14c8a' },
+  yellow: { bg: 'rgba(203,145,47,0.1)', tx: '#cb9101' },
+  brown: { bg: 'rgba(159,107,83,0.1)', tx: '#9f6b53' },
+  default: { bg: 'var(--surface-container)', tx: 'var(--ink-variant)' },
+};
+
+function startOfDay(d: Date): Date {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function isOverdue(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  return new Date(dateStr) < new Date();
+}
+
+function getCategoryColor(color: string) {
+  return CATEGORY_COLORS[color] || CATEGORY_COLORS.default;
+}
+
+const INSIGHT_GRADIENTS = [
+  'linear-gradient(135deg, #006789, #5acafe)',
+  'linear-gradient(135deg, #9e422c, #fe8b70)',
+  'linear-gradient(135deg, #a78bfa, #7c3aed)',
+  'linear-gradient(135deg, #93c5fd, #2563eb)',
+];
+
+function getCTAMessage(hour: number) {
+  if (hour < 11) return { title: '오늘의 할 일을\n정리해봐요.', button: '오늘 계획', tab: 'task' as SheetTab };
+  if (hour < 14) return { title: '오전 성과를\n기록해보세요.', button: '진행 상황 기록', tab: 'memo' as SheetTab };
+  if (hour < 18) return { title: '오후 집중\n시간이에요.', button: '빠른 메모', tab: 'memo' as SheetTab };
+  if (hour < 22) return { title: '내일 준비를\n해보세요.', button: '내일 일정 추가', tab: 'task' as SheetTab };
+  return { title: '오늘 하루\n어떠셨나요?', button: '회고 작성', tab: 'memo' as SheetTab };
+}
 
 export default function HomePage() {
-  const [widgetSheetOpen, setWidgetSheetOpen] = useState(false);
-  const [configWidgetType, setConfigWidgetType] = useState<string | null>(null);
-  const [configDb, setConfigDb] = useState(DB_OPTIONS[0]);
-  const [configSize, setConfigSize] = useState('Medium');
-  const [dbDropdownOpen, setDbDropdownOpen] = useState(false);
-  const [widgetAddedMsg, setWidgetAddedMsg] = useState(false);
+  const router = useRouter();
+  const { data: tasks, loading: tasksLoading, isMock: tasksMock, refetch: refetchTasks } = useNotionData<Task[]>('tasks');
+  const { data: insights, loading: insightsLoading, isMock: insightsMock } = useNotionData<Insight[]>('insights');
+  const { data: finance } = useNotionData<FinanceEntry[]>('finance');
+  const { data: works } = useNotionData<Work[]>('works');
+  const { data: weeklyMetrics } = useNotionData<WeeklyMetrics>('metrics/weekly');
+  const toggleMutation = useMutation('tasks', 'POST');
+  const { toast, showToast } = useToast();
 
-  const { data: tasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useNotionData<Task[]>('tasks');
-  const { data: finance, loading: financeLoading, error: financeError, refetch: refetchFinance } = useNotionData<FinanceEntry[]>('finance');
-  const { data: insights, loading: insightsLoading, error: insightsError } = useNotionData<Insight[]>('insights');
-  const { data: works, loading: worksLoading, error: worksError } = useNotionData<Work[]>('works');
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetDefaultTab, setSheetDefaultTab] = useState<SheetTab>('task');
+  const [localTasks, setLocalTasks] = useState<Task[] | null>(null);
+  const [taskFilter, setTaskFilter] = useState<TaskFilter>('오늘');
 
-  // Metric calculations
-  const incomeTotal = finance
-    ? finance.filter((f) => f.type === 'income').reduce((sum, f) => sum + f.amount, 0)
-    : 0;
-  const incomeMan = Math.round(incomeTotal / 10000);
+  const taskList = localTasks ?? tasks ?? [];
+  const insightList = insights ?? [];
+  const financeList = finance ?? [];
+  const workList = works ?? [];
+  const isMock = tasksMock || insightsMock;
 
-  const undoneTasks = tasks ? tasks.filter((t) => !t.done) : [];
-  const undoneCount = undoneTasks.length;
+  const today = new Date();
+  const todayStart = startOfDay(today);
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayLabel = `${dayNames[today.getDay()]}, ${monthNames[today.getMonth()]} ${today.getDate()}`;
 
-  const dDay = tasks
-    ? tasks
-        .filter((t) => !t.done && t.dueDate)
-        .map((t) => Math.ceil((new Date(t.dueDate!).getTime() - Date.now()) / 86400000))
-        .sort((a, b) => a - b)[0] ?? 0
-    : 0;
+  // ---- Calendar widget: next upcoming event + day progress ----
+  const upcomingEvents = useMemo(() => {
+    return taskList
+      .filter((t) => t.dueDate && !t.done && new Date(t.dueDate) >= todayStart)
+      .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskList]);
 
-  function handleWidgetSelect(type: string) {
-    setWidgetSheetOpen(false);
-    setConfigWidgetType(type);
-    setConfigDb(DB_OPTIONS[0]);
-    setConfigSize('Medium');
-    setDbDropdownOpen(false);
-  }
+  const nextEvent = upcomingEvents[0];
+  const todayEventsCount = useMemo(() => {
+    return taskList.filter((t) => {
+      if (!t.dueDate) return false;
+      const d = startOfDay(new Date(t.dueDate));
+      return d.getTime() === todayStart.getTime();
+    }).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskList]);
 
-  function handleConfigClose() {
-    setConfigWidgetType(null);
-    setDbDropdownOpen(false);
-  }
+  const dayProgressPct = Math.round(((today.getHours() * 60 + today.getMinutes()) / (24 * 60)) * 100);
 
-  function handleConfigBack() {
-    setConfigWidgetType(null);
-    setDbDropdownOpen(false);
-    setWidgetSheetOpen(true);
-  }
+  // ---- Pending widget: due within 3 days ----
+  const urgentCount = useMemo(() => {
+    const threshold = new Date(todayStart);
+    threshold.setDate(threshold.getDate() + 3);
+    return taskList.filter((t) => {
+      if (t.done || !t.dueDate) return false;
+      const due = new Date(t.dueDate);
+      return due <= threshold;
+    }).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskList]);
 
-  function handleWidgetAdd() {
-    handleConfigClose();
-    setWidgetAddedMsg(true);
-    setTimeout(() => setWidgetAddedMsg(false), 2000);
-  }
+  const pendingCount = useMemo(() => taskList.filter((t) => !t.done).length, [taskList]);
+
+  const urgentColor = urgentCount === 0
+    ? 'var(--tertiary)'
+    : urgentCount <= 2
+    ? '#d9730d'
+    : 'var(--error)';
+
+  // ---- Task list filtering ----
+  const filteredTasks = useMemo(() => {
+    const weekEnd = new Date(todayStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    switch (taskFilter) {
+      case '오늘': {
+        // today's tasks + overdue incomplete
+        const list = taskList.filter((t) => {
+          if (t.done) return false;
+          if (!t.dueDate) return false;
+          const due = new Date(t.dueDate);
+          const dueStart = startOfDay(due);
+          if (dueStart.getTime() === todayStart.getTime()) return true;
+          if (due < todayStart) return true; // overdue
+          return false;
+        });
+        return list.sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+      }
+      case '이번 주': {
+        const list = taskList.filter((t) => {
+          if (t.done || !t.dueDate) return false;
+          const due = new Date(t.dueDate);
+          return due <= weekEnd;
+        });
+        return list.sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+      }
+      case '지연': {
+        const list = taskList.filter((t) => {
+          if (t.done || !t.dueDate) return false;
+          return new Date(t.dueDate) < todayStart;
+        });
+        return list.sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+      }
+      case '완료': {
+        // done tasks, most recent first (by dueDate as proxy)
+        const list = taskList.filter((t) => t.done);
+        return list.sort((a, b) => {
+          const aT = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+          const bT = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          return bT - aT;
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskList, taskFilter]);
+
+  const displayTasks = filteredTasks.slice(0, 10);
+
+  // ---- Badge in the task list header (context-aware per filter) ----
+  const taskBadge = useMemo(() => {
+    switch (taskFilter) {
+      case '오늘': {
+        const todayAll = taskList.filter((t) => {
+          if (!t.dueDate) return false;
+          return startOfDay(new Date(t.dueDate)).getTime() === todayStart.getTime();
+        });
+        const done = todayAll.filter((t) => t.done).length;
+        const total = todayAll.length || 1;
+        return `${Math.round((done / total) * 100)}% DONE`;
+      }
+      case '이번 주': {
+        const weekEnd = new Date(todayStart);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        const weekAll = taskList.filter((t) => {
+          if (!t.dueDate) return false;
+          const d = new Date(t.dueDate);
+          return d <= weekEnd && d >= todayStart;
+        });
+        const done = weekAll.filter((t) => t.done).length;
+        const total = weekAll.length || 1;
+        return `${Math.round((done / total) * 100)}% DONE`;
+      }
+      case '지연': {
+        const overdue = taskList.filter((t) => !t.done && t.dueDate && new Date(t.dueDate) < todayStart).length;
+        return `${overdue} OVERDUE`;
+      }
+      case '완료': {
+        return `${taskList.filter((t) => t.done).length} COMPLETED`;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskList, taskFilter]);
+
+  // ---- Focus area badges ----
+  const financeMonthTotal = useMemo(() => {
+    const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+    return financeList
+      .filter((f) => f.date && new Date(f.date) >= monthStart && f.type === 'expense')
+      .reduce((sum, f) => sum + (f.amount || 0), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [financeList]);
+
+  const insightsCount = insightList.length;
+  const worksProgressCount = workList.filter((w) => w.status === 'progress').length;
+
+  const formatWon = (n: number): string => {
+    if (n >= 10000) return `${Math.round(n / 10000)}만`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+    return String(n);
+  };
+
+  const FOCUS_AREAS = [
+    { icon: Briefcase, label: '태스크', bg: 'rgba(97, 94, 87, 0.08)', color: '#615e57', href: '/db/tasks', badge: String(pendingCount) },
+    { icon: Wallet, label: '가계부', bg: 'rgba(158, 66, 44, 0.08)', color: '#9e422c', href: '/db/finance', badge: financeMonthTotal > 0 ? `₩${formatWon(financeMonthTotal)}` : '0' },
+    { icon: Lightbulb, label: '인사이트', bg: 'rgba(0, 103, 137, 0.08)', color: '#006789', href: '/db/insights', badge: String(insightsCount) },
+    { icon: Palette, label: '웍스', bg: 'rgba(0, 103, 137, 0.08)', color: '#006789', href: '/db/works', badge: String(worksProgressCount) },
+  ];
+
+  // ---- Focus time widget: weekly completion rate change ----
+  const weeklyChangePct = useMemo(() => {
+    if (!weeklyMetrics) return null;
+    const { thisWeekDone, lastWeekDone } = weeklyMetrics;
+    if (lastWeekDone === 0) return thisWeekDone > 0 ? 100 : 0;
+    return Math.round(((thisWeekDone - lastWeekDone) / lastWeekDone) * 100);
+  }, [weeklyMetrics]);
+
+  const dailyBars = useMemo(() => {
+    if (!weeklyMetrics) return [40, 65, 45, 70, 55, 80, 90];
+    const max = Math.max(...weeklyMetrics.dailyDone, 1);
+    return weeklyMetrics.dailyDone.map((n) => Math.max(8, Math.round((n / max) * 100)));
+  }, [weeklyMetrics]);
+
+  // ---- Time widget: tasks completed today ----
+  const completedToday = useMemo(() => {
+    return taskList.filter((t) => {
+      if (!t.done) return false;
+      if (!t.dueDate) return false;
+      return startOfDay(new Date(t.dueDate)).getTime() === todayStart.getTime();
+    }).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskList]);
+
+  const todayDoneCount = weeklyMetrics?.todayDone ?? completedToday;
+
+  // ---- Next upcoming event title (truncated) ----
+  const nextEventLabel = useMemo(() => {
+    if (!nextEvent) return monthNames[today.getMonth()];
+    const t = nextEvent.title;
+    return t.length > 15 ? `${t.slice(0, 15)}…` : t;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextEvent]);
+
+  // ---- CTA context-aware ----
+  const cta = useMemo(() => getCTAMessage(today.getHours()), [today]);
+
+  // ---- Handlers ----
+  const handleToggle = useCallback(async (task: Task) => {
+    const updated = taskList.map((t) =>
+      t.id === task.id ? { ...t, done: !t.done } : t,
+    );
+    setLocalTasks(updated);
+
+    const result = await toggleMutation.mutate({ id: task.id, done: !task.done });
+    if (!result) {
+      setLocalTasks(taskList);
+      showToast('Failed to update task');
+    } else {
+      showToast(task.done ? 'Task reopened' : 'Task completed');
+    }
+  }, [taskList, toggleMutation, showToast]);
+
+  const handleCreated = useCallback((msg: string) => {
+    showToast(msg);
+    setLocalTasks(null);
+    refetchTasks();
+  }, [showToast, refetchTasks]);
+
+  const openSheet = useCallback((tab: SheetTab = 'task') => {
+    setSheetDefaultTab(tab);
+    setSheetOpen(true);
+  }, []);
+
+  // Sorted insights by lastEditedAt desc
+  const sortedInsights = useMemo(() => {
+    return [...insightList].sort((a, b) => {
+      const aT = a.lastEditedAt ? new Date(a.lastEditedAt).getTime() : 0;
+      const bT = b.lastEditedAt ? new Date(b.lastEditedAt).getTime() : 0;
+      return bT - aT;
+    });
+  }, [insightList]);
+  const firstTwoInsights = sortedInsights.slice(0, 2);
 
   return (
-    <>
-      <Header />
-
-      {/* ============ CALLOUT ============ */}
-      <div className="callout anim a1">
-        <div className="callout-icon">
-          <Lightbulb size={11} />
-        </div>
-        <div className="callout-body">
-          <strong>오늘의 포커스</strong> — 해커스 2차시 수정본 전달 · 매직라이트 영상 최종 게시
-          <br />
-          <span className="muted">오후 2시 세븐플러스 미팅, 저녁 RelayAX 피드백 정리</span>
-        </div>
-      </div>
-
-      {/* ============ METRICS ============ */}
-      <section className="w-section anim a2" style={{ marginTop: 18 }}>
-        {(tasksLoading || financeLoading) ? (
-          <LoadingSkeleton variant="metric" />
-        ) : (
-          <div className="metric-strip">
-            <MetricCard
-              accent="#2a9d99"
-              icon={<ArrowDownToLine size={11} />}
-              iconColor="teal"
-              label="예정 수입"
-              value={incomeMan}
-              unit="만원"
-              valueColor="teal"
-              sub={<><ArrowUpRight size={8} /> {finance ? finance.filter((f) => f.type === 'income').length : 0}건 대기</>}
-            />
-            <MetricCard
-              accent="var(--n-red-tx)"
-              icon={<Timer size={11} />}
-              iconColor="red"
-              label="D-Day"
-              value={dDay}
-              unit="일"
-              valueColor="red"
-              sub={<><Flag size={8} /> 최근 마감</>}
-            />
-            <MetricCard
-              accent="var(--n-orange-tx)"
-              icon={<AlertCircle size={11} />}
-              iconColor="orange"
-              label="미완료"
-              value={undoneCount}
-              unit="건"
-              valueColor="orange"
-              sub={<><Clock3 size={8} /> 마감 지연</>}
-            />
+    <div className="page-content" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {/* Top App Bar */}
+      <header className="top-bar">
+        <div className="top-bar-left">
+          <div className="top-bar-icon">
+            <LayoutGrid />
           </div>
-        )}
+          <span className="top-bar-title">Beyondworks</span>
+          {isMock && <span className="demo-pill">Demo</span>}
+        </div>
+        <div className="top-bar-avatar">
+          <User />
+        </div>
+      </header>
+
+      {/* Welcome Section */}
+      <section className="welcome anim-in">
+        <p className="welcome-label">{dayLabel}</p>
+        <h1 className="welcome-title">Good Morning.</h1>
       </section>
 
-      {/* ============ QUICK ACTIONS ============ */}
-      <section className="w-section anim a3" style={{ marginTop: 14 }}>
-        <div className="qa-strip">
-          <button className="qa-btn">
-            <div className="qa-icon" style={{ background: 'var(--n-blue-bg)', color: 'var(--n-blue-tx)' }}>
-              <CalendarPlus size={15} />
-            </div>
-            <span className="qa-name">일정 추가</span>
-          </button>
-          <button className="qa-btn">
-            <div className="qa-icon" style={{ background: 'var(--n-green-bg)', color: 'var(--n-green-tx)' }}>
-              <Receipt size={15} />
-            </div>
-            <span className="qa-name">지출 기록</span>
-          </button>
-          <button className="qa-btn">
-            <div className="qa-icon" style={{ background: 'var(--n-purple-bg)', color: 'var(--n-purple-tx)' }}>
-              <FileText size={15} />
-            </div>
-            <span className="qa-name">메모</span>
-          </button>
-          <button className="qa-btn">
-            <div className="qa-icon" style={{ background: 'var(--n-gray-bg)', color: 'var(--n-gray-tx)' }}>
-              <Search size={15} />
-            </div>
-            <span className="qa-name">검색</span>
-          </button>
-        </div>
-      </section>
+      {/* Bento Grid */}
+      <section style={{ marginTop: 28 }}>
+        <div className="bento-grid">
 
-      {/* ============ 인사이트 ============ */}
-      <section className="w-section anim a4">
-        <SectionHead
-          icon={<Sparkles size={10} style={{ color: 'var(--n-purple-tx)' }} />}
-          iconColor="var(--n-purple-tx)"
-          title="인사이트"
-          moreLabel="더보기"
-          href="/insights"
-        />
-        <div className="rail">
-          {insightsLoading && <LoadingSkeleton variant="card" />}
-          {insightsError && !insightsLoading && (
-            <ErrorState message={insightsError} />
-          )}
-          {!insightsLoading && !insightsError && (insights ?? []).slice(0, 3).map((insight) => (
-            <SlideCard
-              key={insight.id}
-              coverGradient={insight.coverColor}
-              coverTag={insight.category}
-              coverTagColor="rgba(0,0,0,0.6)"
-              title={insight.title}
-              desc={insight.description}
-              tags={insight.tags.slice(0, 2).map((tag) => ({ label: tag, className: 'n-tag gray' }))}
-              href="/insights"
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* ============ 웍스 ============ */}
-      <section className="w-section anim a5">
-        <SectionHead
-          icon={<Briefcase size={10} style={{ color: 'var(--n-blue-tx)' }} />}
-          iconColor="var(--n-blue-tx)"
-          title="웍스"
-          moreLabel="더보기"
-          href="/works"
-        />
-        <div className="rail">
-          {worksLoading && <LoadingSkeleton variant="card" />}
-          {worksError && !worksLoading && (
-            <ErrorState message={worksError} />
-          )}
-          {!worksLoading && !worksError && (works ?? []).slice(0, 3).map((work) => (
-            <SlideCard
-              key={work.id}
-              coverGradient={work.coverColor}
-              coverTag={work.category}
-              coverTagColor="rgba(0,0,0,0.6)"
-              title={work.title}
-              desc={work.description}
-              tags={[{ label: work.status === 'done' ? '완료' : work.status === 'progress' ? '진행중' : '대기', className: `n-status ${work.status}` }]}
-              href="/works"
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* ============ 태스크 ============ */}
-      <section className="w-section anim a6">
-        <SectionHead
-          icon={<CheckCircle2 size={10} style={{ color: 'var(--n-red-tx)' }} />}
-          iconColor="var(--n-red-tx)"
-          title="태스크"
-          moreLabel="전체"
-          href="/tasks"
-        />
-        {tasksLoading && <LoadingSkeleton variant="table" />}
-        {tasksError && !tasksLoading && <ErrorState message={tasksError} onRetry={refetchTasks} />}
-        {!tasksLoading && !tasksError && (
-          <DBTable
-            columns={[
-              { key: 'icon', icon: null, label: '', className: 'h-icon' },
-              { key: 'name', icon: <Type size={8} />, label: '이름', className: 'h-name' },
-              { key: 'tag', icon: <Tag size={8} />, label: '분류', className: 'h-prop' },
-              { key: 'date', icon: <Calendar size={8} />, label: '마감', className: 'h-date' },
-            ]}
-            rows={(tasks ?? []).slice(0, 5).map((task) => {
-              const dateStr = task.dueDate
-                ? `${new Date(task.dueDate).getMonth() + 1}/${new Date(task.dueDate).getDate()}`
-                : '';
-              const isOverdue = task.dueDate
-                ? new Date(task.dueDate).getTime() < Date.now() && !task.done
-                : false;
-              return {
-                key: task.id,
-                cells: [
-                  <div key="c" className={`db-chk${task.done ? ' done' : ''}`}>{task.done && <Check size={7} />}</div>,
-                  <div key="t" className={`db-title${task.done ? ' strike' : ''}`}>{task.title}</div>,
-                  <div key="p" className="db-prop"><span className={`n-tag ${task.categoryColor}`}>{task.category}</span></div>,
-                  <div key="d" className={`db-date${isOverdue ? ' warn' : ''}`}>{dateStr}</div>,
-                ],
-              };
-            })}
-          />
-        )}
-      </section>
-
-      {/* ============ 파이낸스 ============ */}
-      <section className="w-section anim a7">
-        <SectionHead
-          icon={<Banknote size={10} style={{ color: '#2a9d99' }} />}
-          iconColor="#2a9d99"
-          title="파이낸스"
-          moreLabel="더보기"
-          href="/finance"
-        />
-        {financeLoading && <LoadingSkeleton variant="table" />}
-        {financeError && !financeLoading && <ErrorState message={financeError} onRetry={refetchFinance} />}
-        {!financeLoading && !financeError && (
-          <DBTable
-            columns={[
-              { key: 'icon', icon: null, label: '', className: 'h-icon' },
-              { key: 'name', icon: <Type size={8} />, label: '클라이언트', className: 'h-name' },
-              { key: 'schedule', icon: <CalendarClock size={8} />, label: '예정', className: 'h-prop', width: 70 },
-              { key: 'amount', icon: <Coins size={8} />, label: '금액', className: 'h-date', width: 50 },
-            ]}
-            rows={(finance ?? []).slice(0, 4).map((entry) => {
-              const dateLabel = entry.date
-                ? `${new Date(entry.date).getMonth() + 1}/${new Date(entry.date).getDate()}`
-                : '예정일 미정';
-              const amountMan = Math.round(entry.amount / 10000);
-              return {
-                key: entry.id,
-                className: 'fin',
-                cells: [
-                  <div key="i" className="n-page-icon blue"><Building2 size={10} /></div>,
-                  <div key="t" className="db-title">{entry.client}</div>,
-                  <div key="p" className="db-prop"><span className={`n-tag ${entry.date ? 'green' : 'gray'}`}>{dateLabel}</span></div>,
-                  <div key="d" className="db-date db-amount">{amountMan}만</div>,
-                ],
-              };
-            })}
-            variant="finance"
-          />
-        )}
-      </section>
-
-      {/* ============ ADD SECTION ============ */}
-      <button className="add-section" onClick={() => setWidgetSheetOpen(true)}>
-        <Plus size={10} /> 위젯 섹션 추가
-      </button>
-
-      {/* ============ WIDGET BOTTOM SHEET ============ */}
-      <BottomSheet
-        open={widgetSheetOpen}
-        onClose={() => setWidgetSheetOpen(false)}
-        title="위젯 추가"
-      >
-        <div className="bs-opt" onClick={() => handleWidgetSelect('숫자 카드')}>
-          <div className="bs-icon" style={{ color: 'var(--n-blue-tx)' }}><Hash size={13} /></div>
-          <div><div className="bs-name">숫자 카드</div><div className="bs-desc">단일 메트릭 (합계, D-day, 카운트)</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('리스트')}>
-          <div className="bs-icon" style={{ color: 'var(--n-green-tx)' }}><List size={13} /></div>
-          <div><div className="bs-name">리스트</div><div className="bs-desc">체크박스 + 날짜 세로 목록</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('카드 슬라이드')}>
-          <div className="bs-icon" style={{ color: 'var(--n-purple-tx)' }}><Layers size={13} /></div>
-          <div><div className="bs-name">카드 슬라이드</div><div className="bs-desc">가로 스와이프 썸네일 카드</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('캘린더')}>
-          <div className="bs-icon" style={{ color: 'var(--n-blue-tx)' }}><Calendar size={13} /></div>
-          <div><div className="bs-name">캘린더</div><div className="bs-desc">월간 미니 캘린더 + 이벤트 도트</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('갤러리')}>
-          <div className="bs-icon" style={{ color: 'var(--n-orange-tx)' }}><Image size={13} /></div>
-          <div><div className="bs-name">갤러리</div><div className="bs-desc">2~3열 이미지 그리드</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('프로그레스')}>
-          <div className="bs-icon" style={{ color: 'var(--n-green-tx)' }}><Activity size={13} /></div>
-          <div><div className="bs-name">프로그레스</div><div className="bs-desc">원형/바 진행률 표시</div></div>
-        </div>
-        <div className="bs-opt" onClick={() => handleWidgetSelect('퀵 액션')}>
-          <div className="bs-icon" style={{ color: 'var(--n-brown-tx)' }}><Zap size={13} /></div>
-          <div><div className="bs-name">퀵 액션</div><div className="bs-desc">원터치 바로가기 버튼</div></div>
-        </div>
-      </BottomSheet>
-
-      {/* ============ WIDGET ADDED TOAST ============ */}
-      {widgetAddedMsg && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 'calc(72px + env(safe-area-inset-bottom, 0px) + 12px)',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'var(--n-ink)',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 500,
-            padding: '9px 18px',
-            borderRadius: 20,
-            zIndex: 200,
-            whiteSpace: 'nowrap',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-          }}
-        >
-          위젯이 추가되었습니다
-        </div>
-      )}
-
-      {/* ============ CONFIG BOTTOM SHEET ============ */}
-      <BottomSheet
-        open={configWidgetType !== null}
-        onClose={handleConfigClose}
-        title={configWidgetType ? `${configWidgetType} 설정` : ''}
-      >
-        {/* Back button rendered above the sheet content via absolute positioning workaround — injected as first child */}
-        <div style={{ position: 'absolute', top: 16, left: 16 }}>
-          <button
-            onClick={handleConfigBack}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 4,
-              display: 'flex',
-              alignItems: 'center',
-              color: 'var(--n-ink)',
-              opacity: 0.5,
-            }}
+          {/* Calendar Widget (1x1) */}
+          <div
+            className="card anim-in anim-in-d1"
+            onClick={() => router.push('/db/tasks')}
+            style={{ aspectRatio: '1', padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', cursor: 'pointer' }}
           >
-            <ArrowLeft size={16} />
-          </button>
-        </div>
-
-        {/* DB 선택 */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--n-ink)', opacity: 0.5, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            DB 선택
-          </div>
-          <div style={{ position: 'relative' }}>
-            <div
-              onClick={() => setDbDropdownOpen(v => !v)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '9px 12px',
-                border: '1px solid var(--n-border)',
-                borderRadius: 8,
-                background: 'var(--n-surface)',
-                cursor: 'pointer',
-                fontSize: 13,
-                color: 'var(--n-ink)',
-              }}
-            >
-              <span>{configDb}</span>
-              <ChevronDown size={13} style={{ opacity: 0.5 }} />
-            </div>
-            {dbDropdownOpen && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Calendar style={{ width: 14, height: 14, color: 'var(--ink-outline)' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-variant)' }}>Calendar</span>
+              </div>
+              <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-2px', lineHeight: 1, color: 'var(--ink)' }}>
+                {today.getDate()}
+              </div>
               <div
+                title={nextEvent?.title ?? ''}
                 style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  left: 0,
-                  right: 0,
-                  background: 'var(--n-surface)',
-                  border: '1px solid var(--n-border)',
-                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: nextEvent ? 'var(--tertiary)' : 'var(--error)',
+                  marginTop: 4,
                   overflow: 'hidden',
-                  zIndex: 10,
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {DB_OPTIONS.map(opt => (
-                  <div
-                    key={opt}
-                    onClick={() => { setConfigDb(opt); setDbDropdownOpen(false); }}
-                    style={{
-                      padding: '9px 12px',
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      background: configDb === opt ? 'var(--n-blue-bg)' : 'transparent',
-                      color: configDb === opt ? 'var(--n-blue-tx)' : 'var(--n-ink)',
-                    }}
-                  >
-                    {opt}
+                {nextEventLabel}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-variant)', marginBottom: 6 }}>
+                오늘 이벤트 {todayEventsCount}개
+              </div>
+              <div style={{ height: 4, borderRadius: 9999, background: 'var(--surface-container)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${dayProgressPct}%`, borderRadius: 9999, background: 'var(--tertiary)' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Pending Widget (1x1) */}
+          <div
+            className="card anim-in anim-in-d2"
+            onClick={() => router.push('/db/tasks?urgent=3d')}
+            style={{ aspectRatio: '1', padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', cursor: 'pointer' }}
+          >
+            <div>
+              <div style={{ width: 36, height: 36, borderRadius: 'var(--r-md)', background: 'rgba(0, 103, 137, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <ListChecks style={{ width: 18, height: 18, color: 'var(--tertiary)' }} />
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-variant)' }}>
+                Pending
+              </div>
+            </div>
+            <div>
+              {tasksLoading ? (
+                <div className="skeleton" style={{ height: 36, width: 48 }} />
+              ) : (
+                <div style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1, color: urgentColor }}>
+                  {urgentCount}
+                </div>
+              )}
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-variant)', marginTop: 4 }}>
+                3일 이내 마감
+              </div>
+            </div>
+          </div>
+
+          {/* Task List (2-col span) */}
+          <div className="card span-2 anim-in anim-in-d3" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 'var(--r-sm)', background: 'rgba(158, 66, 44, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap style={{ width: 14, height: 14, color: 'var(--error)' }} />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.2px' }}>오늘 할 일</span>
+              </div>
+              {!tasksLoading && (
+                <span className="pill active" style={{ fontSize: 10 }}>{taskBadge}</span>
+              )}
+            </div>
+
+            {/* Filter pills */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }} className="hide-scrollbar">
+              {(['오늘', '이번 주', '지연', '완료'] as const).map((f) => (
+                <button key={f} className={`pill${taskFilter === f ? ' active' : ''}`} onClick={() => setTaskFilter(f)}>
+                  {f}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {tasksLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div className="skeleton" style={{ width: 22, height: 22, borderRadius: 6 }} />
+                    <div className="skeleton" style={{ height: 16, flex: 1 }} />
                   </div>
-                ))}
+                ))
+              ) : displayTasks.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--ink-variant)', padding: '12px 0' }}>
+                  {taskFilter === '오늘' ? '오늘 할 일이 없어요' : taskFilter === '지연' ? '지연된 태스크 없음' : taskFilter === '완료' ? '완료한 태스크 없음' : '이번 주 일정 없음'}
+                </div>
+              ) : (
+                displayTasks.map((task) => {
+                  const catColor = getCategoryColor(task.categoryColor);
+                  const dateStr = formatDate(task.dueDate);
+                  const overdue = !task.done && isOverdue(task.dueDate);
+                  return (
+                    <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        className={`task-check${task.done ? ' checked' : ''}`}
+                        onClick={() => handleToggle(task)}
+                      >
+                        {task.done && <Check />}
+                      </div>
+                      <span
+                        onClick={() => router.push(`/edit/${task.id}`)}
+                        style={{
+                          flex: 1,
+                          fontSize: 14,
+                          fontWeight: 500,
+                          letterSpacing: '-0.2px',
+                          color: task.done ? 'var(--ink-outline)' : 'var(--ink)',
+                          textDecoration: task.done ? 'line-through' : 'none',
+                          cursor: 'pointer',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {task.title}
+                      </span>
+                      {task.category && (
+                        <span className="pill" style={{ background: catColor.bg, color: catColor.tx, fontSize: 10, flexShrink: 0 }}>
+                          {task.category}
+                        </span>
+                      )}
+                      {dateStr && (
+                        <span style={{ fontSize: 12, fontWeight: 500, color: overdue ? 'var(--error)' : 'var(--ink-variant)', flexShrink: 0 }}>
+                          {dateStr}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* View all link */}
+            {!tasksLoading && filteredTasks.length > 10 && (
+              <div
+                onClick={() => router.push('/tasks')}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 12, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--tertiary)' }}
+              >
+                <span>전체 보기</span>
+                <ChevronRight style={{ width: 14, height: 14 }} />
               </div>
             )}
           </div>
-        </div>
 
-        {/* 사이즈 선택 */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--n-ink)', opacity: 0.5, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            사이즈 선택
+          {/* Insight Cards (2-col span) */}
+          <div className="span-2 anim-in anim-in-d4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {insightsLoading ? (
+              Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="card" style={{ overflow: 'hidden' }}>
+                  <div className="skeleton" style={{ height: 100 }} />
+                  <div style={{ padding: 12 }}>
+                    <div className="skeleton" style={{ height: 16, width: '80%' }} />
+                  </div>
+                </div>
+              ))
+            ) : (
+              firstTwoInsights.map((insight, idx) => (
+                <div
+                  key={insight.id}
+                  className="card"
+                  onClick={() => router.push(`/edit/${insight.id}`)}
+                  style={{ overflow: 'hidden', position: 'relative', cursor: 'pointer', transition: 'transform 0.15s' }}
+                  onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+                  onMouseUp={(e) => (e.currentTarget.style.transform = '')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = '')}
+                  onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+                  onTouchEnd={(e) => (e.currentTarget.style.transform = '')}
+                >
+                  <div style={{ height: 100, background: insight.coverColor || INSIGHT_GRADIENTS[idx % INSIGHT_GRADIENTS.length], position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 10, left: 10 }}>
+                      <span className="pill" style={{ background: 'rgba(255,255,255,0.25)', color: 'white', backdropFilter: 'blur(8px)' }}>
+                        {insight.category || '인사이트'}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ padding: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px', lineHeight: 1.3 }}>
+                      {insight.title}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+            {!insightsLoading && insightList.length > 2 && (
+              <div
+                onClick={() => router.push('/insights')}
+                style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 4, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--tertiary)' }}
+              >
+                <span>{insightList.length}개 인사이트 전체 보기</span>
+                <ChevronRight style={{ width: 14, height: 14 }} />
+              </div>
+            )}
+            {!insightsLoading && firstTwoInsights.length === 0 && (
+              <>
+                <div className="card" style={{ overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ height: 100, background: INSIGHT_GRADIENTS[0], position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 10, left: 10 }}>
+                      <span className="pill" style={{ background: 'rgba(255,255,255,0.25)', color: 'white', backdropFilter: 'blur(8px)' }}>AI</span>
+                    </div>
+                  </div>
+                  <div style={{ padding: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px', lineHeight: 1.3 }}>Weekly Focus Report</div>
+                  </div>
+                </div>
+                <div className="card" style={{ overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ height: 100, background: INSIGHT_GRADIENTS[1], position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 10, left: 10 }}>
+                      <span className="pill" style={{ background: 'rgba(255,255,255,0.25)', color: 'white', backdropFilter: 'blur(8px)' }}>Trend</span>
+                    </div>
+                  </div>
+                  <div style={{ padding: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px', lineHeight: 1.3 }}>Productivity Insights</div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {SIZE_OPTIONS.map(size => (
-              <button
-                key={size}
-                onClick={() => setConfigSize(size)}
+
+          {/* Focus Time Widget (1x1) */}
+          <div
+            className="card anim-in anim-in-d5"
+            onClick={() => router.push('/db/tasks?filter=완료')}
+            style={{ aspectRatio: '1', padding: 16, background: 'var(--tertiary)', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: 'none', cursor: 'pointer' }}
+          >
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>완료율</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1 }}>
+                {weeklyChangePct === null ? '—' : `${weeklyChangePct >= 0 ? '+' : ''}${weeklyChangePct}%`}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.7, marginTop: 4 }}>지난 주 대비</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, marginTop: 12, height: 28 }}>
+                {dailyBars.map((h, i) => (
+                  <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 2, background: `rgba(255,255,255,${i === 6 ? 1 : 0.35})` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Time (Today Done) Widget (1x1) */}
+          <div
+            className="card anim-in anim-in-d5"
+            onClick={() => router.push('/db/tasks?filter=완료&today=true')}
+            style={{ aspectRatio: '1', padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', cursor: 'pointer' }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock style={{ width: 14, height: 14, color: 'var(--ink-outline)' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-variant)' }}>오늘 완료</span>
+              </div>
+            </div>
+            <div>
+              {todayDoneCount === 0 ? (
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink-outline)' }}>아직 없음</div>
+              ) : (
+                <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1 }}>
+                  {todayDoneCount}
+                  <span style={{ fontSize: 16, fontWeight: 600 }}> 완료</span>
+                </div>
+              )}
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-variant)', marginTop: 4 }}>개 태스크 완료</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Focus Areas */}
+      <section style={{ marginTop: 32 }} className="anim-in anim-in-d6">
+        <div className="section-label">Focus Areas</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '0 20px' }}>
+          {FOCUS_AREAS.map((area) => (
+            <div
+              key={area.label}
+              className="focus-tile"
+              onClick={() => router.push(area.href)}
+              style={{ cursor: 'pointer', position: 'relative' }}
+            >
+              <div
                 style={{
-                  flex: 1,
-                  padding: '8px 0',
-                  border: configSize === size ? '1.5px solid var(--n-blue-tx)' : '1px solid var(--n-border)',
-                  borderRadius: 20,
-                  background: configSize === size ? 'var(--n-blue-bg)' : 'var(--n-surface)',
-                  color: configSize === size ? 'var(--n-blue-tx)' : 'var(--n-ink)',
-                  fontSize: 13,
-                  fontWeight: configSize === size ? 600 : 400,
-                  cursor: 'pointer',
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  background: area.bg,
+                  color: area.color,
+                  borderRadius: 4,
+                  fontWeight: 700,
+                  lineHeight: 1.3,
                 }}
               >
-                {size}
-              </button>
-            ))}
-          </div>
+                {area.badge}
+              </div>
+              <div className="focus-tile-icon" style={{ background: area.bg, color: area.color }}>
+                <area.icon />
+              </div>
+              <span className="focus-tile-label">{area.label}</span>
+            </div>
+          ))}
         </div>
+      </section>
 
-        {/* 완료 버튼 */}
-        <button
-          onClick={handleWidgetAdd}
-          style={{
-            width: '100%',
-            height: 44,
-            background: 'var(--n-ink)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 10,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          위젯 추가
-        </button>
-      </BottomSheet>
-    </>
+      {/* CTA Card */}
+      <section style={{ marginTop: 32 }} className="anim-in anim-in-d6">
+        <div className="cta-card">
+          <h3 style={{ whiteSpace: 'pre-line' }}>{cta.title}</h3>
+          <button onClick={() => openSheet(cta.tab)}>{cta.button}</button>
+        </div>
+      </section>
+
+      {/* spacer for bottom nav */}
+      <div style={{ height: 32 }} />
+
+      {/* FAB */}
+      <button className="fab" onClick={() => openSheet('task')}>
+        <Plus />
+      </button>
+
+      {/* Create Bottom Sheet */}
+      <CreateSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onCreated={handleCreated}
+        defaultTab={sheetDefaultTab}
+      />
+
+      {toast}
+    </div>
   );
 }
