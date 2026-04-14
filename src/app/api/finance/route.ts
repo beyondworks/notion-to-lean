@@ -15,7 +15,7 @@ import { MOCK_FINANCE } from '@/lib/mock-data';
 function pageToFinance(page: any): FinanceEntry {
   const client = getPropertyValueMulti(
     page,
-    ['Name', '이름', 'Title', '제목', '클라이언트', 'Client', '항목'],
+    ['Entry', 'Entry name', 'Name', '이름', 'Title', '제목', '클라이언트', 'Client', '항목'],
     'title',
   );
 
@@ -62,10 +62,14 @@ export async function GET() {
   }
 
   try {
-    const [timelinePages, scheduledPages] = await Promise.all([
-      queryDatabase(DB_IDS.TIMELINE),
-      queryDatabase(DB_IDS.SCHEDULED_FINANCE),
-    ]);
+    // 타임라인 DB는 필수, 예정 수입/지출 DB는 선택 (미공유 시 무시)
+    const timelinePages = await queryDatabase(DB_IDS.TIMELINE);
+    let scheduledPages: any[] = [];
+    try {
+      scheduledPages = await queryDatabase(DB_IDS.SCHEDULED_FINANCE);
+    } catch {
+      // 예정 수입/지출 DB 미공유 — 무시
+    }
 
     const data: FinanceEntry[] = [
       ...timelinePages.map(pageToFinance),

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import {
   LayoutGrid,
   Calendar,
@@ -10,75 +11,97 @@ import {
   TrendingUp,
   FileText,
 } from 'lucide-react';
-
-const WIDGETS = [
-  {
-    title: 'Calendar',
-    desc: 'Upcoming events & schedule',
-    icon: Calendar,
-    bg: 'rgba(0, 103, 137, 0.08)',
-    color: 'var(--tertiary)',
-    stat: '3 events',
-  },
-  {
-    title: 'Tasks',
-    desc: 'Track your to-dos',
-    icon: ListChecks,
-    bg: 'rgba(158, 66, 44, 0.08)',
-    color: 'var(--error)',
-    stat: '5 active',
-  },
-  {
-    title: 'Analytics',
-    desc: 'Weekly performance data',
-    icon: BarChart3,
-    bg: 'rgba(97, 94, 87, 0.08)',
-    color: 'var(--primary)',
-    stat: '+24%',
-  },
-  {
-    title: 'Focus Timer',
-    desc: 'Deep work sessions',
-    icon: Clock,
-    bg: 'rgba(0, 103, 137, 0.08)',
-    color: 'var(--tertiary)',
-    stat: '4.5h today',
-  },
-  {
-    title: 'Quick Actions',
-    desc: 'Shortcuts & automations',
-    icon: Zap,
-    bg: 'rgba(158, 66, 44, 0.08)',
-    color: 'var(--error)',
-    stat: '8 actions',
-  },
-  {
-    title: 'Trends',
-    desc: 'Productivity insights',
-    icon: TrendingUp,
-    bg: 'rgba(97, 94, 87, 0.08)',
-    color: 'var(--primary)',
-    stat: 'Updated',
-  },
-  {
-    title: 'Notes',
-    desc: 'Recent memo archive',
-    icon: FileText,
-    bg: 'rgba(0, 103, 137, 0.08)',
-    color: 'var(--tertiary)',
-    stat: '12 notes',
-  },
-  {
-    title: 'Goals',
-    desc: 'Monthly objectives',
-    icon: LayoutGrid,
-    bg: 'rgba(158, 66, 44, 0.08)',
-    color: 'var(--error)',
-    stat: '60%',
-  },
-];
+import { useNotionData } from '@/lib/hooks';
+import type { Task, Insight } from '@/lib/types';
 
 export default function TasksPage() {
+  const router = useRouter();
+  const { data: tasks, loading: tasksLoading } = useNotionData<Task[]>('tasks');
+  const { data: insights, loading: insightsLoading } = useNotionData<Insight[]>('insights');
+
+  const taskList = tasks ?? [];
+  const insightList = insights ?? [];
+
+  const pendingCount = taskList.filter((t) => !t.done).length;
+  const doneCount = taskList.filter((t) => t.done).length;
+  const totalTasks = taskList.length;
+  const goalPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
+
+  const WIDGETS = [
+    {
+      title: 'Calendar',
+      desc: 'Upcoming events & schedule',
+      icon: Calendar,
+      bg: 'rgba(0, 103, 137, 0.08)',
+      color: 'var(--tertiary)',
+      stat: new Date().toLocaleDateString('en', { month: 'short', day: 'numeric' }),
+      onClick: () => {},
+    },
+    {
+      title: 'Tasks',
+      desc: 'Track your to-dos',
+      icon: ListChecks,
+      bg: 'rgba(158, 66, 44, 0.08)',
+      color: 'var(--error)',
+      stat: tasksLoading ? '...' : `${pendingCount} pending`,
+      onClick: () => router.push('/'),
+    },
+    {
+      title: 'Analytics',
+      desc: 'Weekly performance data',
+      icon: BarChart3,
+      bg: 'rgba(97, 94, 87, 0.08)',
+      color: 'var(--primary)',
+      stat: '+24%',
+      onClick: () => {},
+    },
+    {
+      title: 'Focus Timer',
+      desc: 'Deep work sessions',
+      icon: Clock,
+      bg: 'rgba(0, 103, 137, 0.08)',
+      color: 'var(--tertiary)',
+      stat: '4.5h today',
+      onClick: () => {},
+    },
+    {
+      title: 'Quick Actions',
+      desc: 'Shortcuts & automations',
+      icon: Zap,
+      bg: 'rgba(158, 66, 44, 0.08)',
+      color: 'var(--error)',
+      stat: `${totalTasks} tasks`,
+      onClick: () => router.push('/'),
+    },
+    {
+      title: 'Insights',
+      desc: 'Productivity insights',
+      icon: TrendingUp,
+      bg: 'rgba(97, 94, 87, 0.08)',
+      color: 'var(--primary)',
+      stat: insightsLoading ? '...' : `${insightList.length} items`,
+      onClick: () => {},
+    },
+    {
+      title: 'Notes',
+      desc: 'Recent memo archive',
+      icon: FileText,
+      bg: 'rgba(0, 103, 137, 0.08)',
+      color: 'var(--tertiary)',
+      stat: insightsLoading ? '...' : `${insightList.length} notes`,
+      onClick: () => {},
+    },
+    {
+      title: 'Goals',
+      desc: 'Monthly objectives',
+      icon: LayoutGrid,
+      bg: 'rgba(158, 66, 44, 0.08)',
+      color: 'var(--error)',
+      stat: tasksLoading ? '...' : `${goalPct}%`,
+      onClick: () => {},
+    },
+  ];
+
   return (
     <div className="page-content" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {/* Top bar */}
@@ -109,6 +132,7 @@ export default function TasksPage() {
               key={widget.title}
               className={`card anim-in anim-in-d${Math.min(idx + 1, 6)}`}
               style={{ padding: 16, cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 140 }}
+              onClick={widget.onClick}
             >
               <div>
                 <div style={{

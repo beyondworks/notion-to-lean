@@ -13,13 +13,18 @@ import { MOCK_INSIGHTS } from '@/lib/mock-data';
 // Category -> gradient mapping (fallback when Notion has no cover color)
 // ---------------------------------------------------------------------------
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  AI: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
-  Policy: 'linear-gradient(135deg, #fca5a5 0%, #dc2626 100%)',
-  Design: 'linear-gradient(135deg, #93c5fd 0%, #2563eb 100%)',
-  Tips: 'linear-gradient(135deg, #fdba74 0%, #ea580c 100%)',
+  AI: 'linear-gradient(135deg, #9065b0, #c4b5fd)',
+  'Claude Code': 'linear-gradient(135deg, #006789, #5acafe)',
+  Design: 'linear-gradient(135deg, #006789, #93c5fd)',
+  Branding: 'linear-gradient(135deg, #d9730d, #fbbf24)',
+  Build: 'linear-gradient(135deg, #615e57, #9ca3af)',
+  Marketing: 'linear-gradient(135deg, #c14c8a, #f9a8d4)',
+  Scrap: 'linear-gradient(135deg, #448361, #86efac)',
+  Policy: 'linear-gradient(135deg, #fca5a5, #dc2626)',
+  Tips: 'linear-gradient(135deg, #fdba74, #ea580c)',
 };
 
-const DEFAULT_GRADIENT = 'linear-gradient(135deg, #d1d5db 0%, #6b7280 100%)';
+const DEFAULT_GRADIENT = 'linear-gradient(135deg, #006789, #5acafe)';
 
 // ---------------------------------------------------------------------------
 // Map a Notion page -> Insight
@@ -27,7 +32,7 @@ const DEFAULT_GRADIENT = 'linear-gradient(135deg, #d1d5db 0%, #6b7280 100%)';
 function pageToInsight(page: any): Insight {
   const title = getPropertyValueMulti(
     page,
-    ['Name', '이름', 'Title', '제목'],
+    ['Entry name', 'Name', '이름', 'Title', '제목'],
     'title',
   );
 
@@ -67,6 +72,7 @@ function pageToInsight(page: any): Insight {
     coverColor: CATEGORY_GRADIENTS[category] ?? DEFAULT_GRADIENT,
     tags,
     date,
+    lastEditedAt: page.last_edited_time ?? undefined,
     notionUrl: pageUrl(page.id),
   };
 }
@@ -74,13 +80,16 @@ function pageToInsight(page: any): Insight {
 // ---------------------------------------------------------------------------
 // GET /api/insights
 // ---------------------------------------------------------------------------
-export async function GET() {
+export async function GET(request: Request) {
   if (!isNotionEnabled()) {
     return NextResponse.json({ data: MOCK_INSIGHTS, mock: true });
   }
 
+  const { searchParams } = new URL(request.url);
+  const dbId = searchParams.get('dbId') || DB_IDS.INSIGHTS;
+
   try {
-    const pages = await queryDatabase(DB_IDS.INSIGHTS);
+    const pages = await queryDatabase(dbId);
     const data: Insight[] = pages.map(pageToInsight);
     return NextResponse.json({ data, mock: false });
   } catch (err) {
