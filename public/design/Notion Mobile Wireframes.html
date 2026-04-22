@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1440, initial-scale=1"/>
+<title>Notion 모바일 · 와이어프레임 탐색</title>
+<link rel="stylesheet" href="styles/wireframe.css"/>
+<style>
+  body { background: #F4EDDE; }
+  .banner {
+    padding: 26px 40px 10px;
+    max-width: 980px;
+    font-family: var(--f-hand);
+  }
+  .banner h1 {
+    font-family: var(--f-hand);
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    color: var(--ink);
+  }
+  .banner p {
+    font-family: var(--f-hand);
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.45;
+    margin: 4px 0;
+  }
+  .banner .kicker {
+    font-family: var(--f-label);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .tag-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .legend {
+    display: flex; gap: 14px; align-items: center;
+    margin-top: 10px;
+    font-family: var(--f-hand);
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .legend .lg-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 6px; vertical-align: middle; }
+
+  /* artboard visuals */
+  dc-artboard { background: transparent; }
+  .ab-caption {
+    font-family: var(--f-hand);
+    font-size: 12px;
+    color: var(--ink-3);
+    line-height: 1.4;
+    padding: 10px 6px 0;
+    max-width: 380px;
+  }
+  .ab-caption strong {
+    font-family: var(--f-hand);
+    font-weight: 700;
+    color: var(--ink-2);
+  }
+  .ab-caption .good { color: var(--sage); font-weight: 700; }
+  .ab-caption .bad { color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <div class="kicker">Wireframe Exploration · Low-fi</div>
+  <h1>노션을 모바일에서 <span class="sk-underline">제대로</span> 쓰기</h1>
+  <p>데이터베이스 가로 스크롤, 점으로만 보이는 캘린더, 과하게 긴 페이지 — 불편한 6가지를 풀기 위한 방향 탐색.</p>
+  <p>각 화면마다 3~4개 변형을 나란히 뒀어요. 기준안(baseline)은 현재 노션과 비슷한 형태, 나머지는 모바일에 최적화한 대안입니다. 원하는 방향을 고르면 Artiwave 디자인 시스템으로 고-fi 인터랙티브 프로토타입까지 올릴 수 있어요.</p>
+  <div class="legend">
+    <span><span class="lg-dot" style="background: var(--accent);"></span>핵심 액션/강조</span>
+    <span><span class="lg-dot" style="background: var(--sage);"></span>신상/완료</span>
+    <span><span class="lg-dot" style="background: var(--accent-2);"></span>프리미엄/보조</span>
+    <span>· 375×812 모바일 기준</span>
+  </div>
+</div>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="src/wf-shared.jsx"></script>
+<script type="text/babel" src="src/wf-home.jsx"></script>
+<script type="text/babel" src="src/wf-db.jsx"></script>
+<script type="text/babel" src="src/wf-calendar.jsx"></script>
+<script type="text/babel" src="src/wf-page-nav-event.jsx"></script>
+<script type="text/babel" src="src/wf-token-side.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+/* ─── TWEAKS / Config ─── */
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "sketchiness": "balanced",
+  "showAnnotations": true,
+  "showBaselines": true
+}/*EDITMODE-END*/;
+
+function ArtFrame({ id, title, caption, children }) {
+  return (
+    <DCArtboard id={id} label={title} width={410} height={900}>
+      <div style={{display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 0"}}>
+        {children}
+        {caption && <div className="ab-caption" dangerouslySetInnerHTML={{__html: caption}}/>}
+      </div>
+    </DCArtboard>
+  );
+}
+
+function App() {
+  const [tw, setTw] = React.useState(TWEAKS);
+  const [editOpen, setEditOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (!e.data || typeof e.data !== "object") return;
+      if (e.data.type === "__activate_edit_mode") setEditOpen(true);
+      if (e.data.type === "__deactivate_edit_mode") setEditOpen(false);
+    };
+    window.addEventListener("message", handler);
+    // announce availability AFTER listener is registered
+    window.parent.postMessage({type: "__edit_mode_available"}, "*");
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  const update = (k, v) => {
+    const next = {...tw, [k]: v};
+    setTw(next);
+    window.parent.postMessage({type: "__edit_mode_set_keys", edits: {[k]: v}}, "*");
+  };
+
+  // Apply sketchiness to CSS vars
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const level = tw.sketchiness;
+    if (level === "clean") {
+      root.style.setProperty("--hairline", "rgba(28, 24, 19, 0.12)");
+      root.style.setProperty("--hairline-strong", "rgba(28, 24, 19, 0.28)");
+    } else if (level === "very") {
+      root.style.setProperty("--hairline", "rgba(28, 24, 19, 0.26)");
+      root.style.setProperty("--hairline-strong", "rgba(28, 24, 19, 0.58)");
+    } else {
+      root.style.setProperty("--hairline", "rgba(28, 24, 19, 0.18)");
+      root.style.setProperty("--hairline-strong", "rgba(28, 24, 19, 0.42)");
+    }
+  }, [tw.sketchiness]);
+
+  return (
+    <>
+      <DCCanvas initialZoom={0.62}>
+
+        {/* ═══════════════ SECTION 1: TOKEN / ONBOARDING ═══════════════ */}
+        <DCSection id="sec-token" title="N°01 · Notion API 토큰 연결">
+
+          <ArtFrame id="tok-1" title="랜딩"
+            caption="첫 인상 — <strong>에디토리얼 톤의 한 문장</strong>으로 가치를 설명. 연결 버튼 · 토큰 직접 붙여넣기 두 갈래.">
+            <TokenV1_Landing/>
+          </ArtFrame>
+
+          <ArtFrame id="tok-2" title="토큰 붙여넣기"
+            caption="QR 스캔 옵션 포함 · <strong>키체인 저장</strong> 문구로 신뢰. 연결되는 즉시 감지된 workspace 요약 표시.">
+            <TokenV2_Paste/>
+          </ArtFrame>
+
+          <ArtFrame id="tok-3" title="DB 선택 (온보딩)"
+            caption="워크스페이스 전체 대신 <strong>자주 쓰는 DB만 선별</strong> — 홈에 박히고 동기화도 빠름. 한 번에 해결.">
+            <TokenV3_DbPicker/>
+          </ArtFrame>
+        </DCSection>
+
+        {/* ═══════════════ SECTION 2: HOME / WORKSPACE ═══════════════ */}
+        <DCSection id="sec-home" title="N°02 · 홈 / 워크스페이스 진입">
+
+          <ArtFrame id="home-1" title="A · Tree (Baseline)"
+            caption="<span class='bad'>× 현 노션과 유사.</span> 트리 들여쓰기로 모바일에서 좁고 길다. 기준선 비교용.">
+            <HomeV1_TreeBaseline/>
+          </ArtFrame>
+
+          <ArtFrame id="home-2" title="B · Pinned Cards"
+            caption="<span class='good'>+</span> 자주 쓰는 DB/페이지를 <strong>2열 카드</strong>로. 나머지는 리스트로 분리. 첫 화면에서 바로 진입.">
+            <HomeV2_CardGrid/>
+          </ArtFrame>
+
+          <ArtFrame id="home-3" title="C · Dock + 가로 DB 선반"
+            caption="<span class='good'>+</span> 숫자 대시보드 + <strong>가로 스크롤 DB 선반</strong> + 오늘 프리뷰. 한 화면에 문맥을 최대화.">
+            <HomeV3_DockAndShelf/>
+          </ArtFrame>
+
+          <ArtFrame id="home-4" title="D · Command Center"
+            caption="<span class='good'>+</span> 검색/명령 중심. <strong>빠른 캡처 액션</strong> 4개 + AI 추천. 적게 보여주고 빠르게 처리.">
+            <HomeV4_CommandCenter/>
+          </ArtFrame>
+        </DCSection>
+
+        {/* ═══════════════ SECTION 3: DATABASE VIEWS ═══════════════ */}
+        <DCSection id="sec-db" title="N°03 · 데이터베이스 — 가로 표 탈출">
+
+          <ArtFrame id="db-1" title="A · 가로 표 (Baseline)"
+            caption="<span class='bad'>× 불편함 1·2번</span>의 원인. 좌우 스크롤 필수 · 한눈에 안 보임. 기준선.">
+            <DbV1_HorizontalTable/>
+          </ArtFrame>
+
+          <ArtFrame id="db-2" title="B · 스택 카드"
+            caption="<span class='good'>+</span> 제목 크게, 속성은 <strong>메타 라인 1줄</strong>로 축약. 우선순위 컬러 점. 스캔 속도↑.">
+            <DbV2_StackedCards/>
+          </ArtFrame>
+
+          <ArtFrame id="db-3" title="C · 컴팩트 + 컬럼 스와이프"
+            caption="<span class='good'>+</span> 이름 고정 · 오른쪽 셀만 <strong>좌우 스와이프로 컬럼 전환</strong>. 표의 감각은 유지, 스크롤 제거.">
+            <DbV3_SwipeCols/>
+          </ArtFrame>
+
+          <ArtFrame id="db-4" title="D · 그룹 섹션"
+            caption="<span class='good'>+</span> Status별로 접힘/펼침. 체크박스로 빠른 상태 변경. 칸반 보드의 세로 버전.">
+            <DbV4_GroupedSections/>
+          </ArtFrame>
+        </DCSection>
+
+        {/* ═══════════════ SECTION 4: CALENDAR ═══════════════ */}
+        <DCSection id="sec-cal" title="N°04 · 캘린더 — 점(.) 말고 내용을">
+
+          <ArtFrame id="cal-1" title="A · 점 그리드 (Baseline)"
+            caption="<span class='bad'>× 불편함 5번</span> — 점만 찍힘. 무슨 일정인지 모름. 기준선.">
+            <CalV1_DotsBaseline/>
+          </ArtFrame>
+
+          <ArtFrame id="cal-2" title="B · Month + Agenda"
+            caption="<span class='good'>+</span> 월 그리드(컴팩트) + 탭한 날의 <strong>agenda 패널</strong>. 스와이프로 날짜 이동. 가장 균형.">
+            <CalV2_MonthAgenda/>
+          </ArtFrame>
+
+          <ArtFrame id="cal-3" title="C · 주간 타임라인"
+            caption="<span class='good'>+</span> 7일 × 시간축. <strong>일정 제목이 블록에 직접 노출</strong>. 시간 밀도가 중요한 사람용.">
+            <CalV3_WeekTimeline/>
+          </ArtFrame>
+
+          <ArtFrame id="cal-4" title="D · Agenda List"
+            caption="<span class='good'>+</span> 달력 아예 생략 — <strong>날짜별 세로 리스트</strong>. 모바일에서 가장 읽기 쉬움. iOS Agenda 맥락.">
+            <CalV4_AgendaList/>
+          </ArtFrame>
+        </DCSection>
+
+        {/* ═══════════════ SECTION 5: PAGE + OPEN/CLOSE ═══════════════ */}
+        <DCSection id="sec-page" title="N°05 · 페이지 뷰 + 열고 닫기">
+
+          <ArtFrame id="pg-1" title="A · 페이지 뷰 (Baseline)"
+            caption="속성은 태그로 나열 + 본문 블록. 현 노션에 가장 근접.">
+            <PageV1_Baseline/>
+          </ArtFrame>
+
+          <ArtFrame id="pg-2" title="B · 접히는 속성 헤더"
+            caption="<span class='good'>+</span> 2×2 <strong>속성 요약</strong> 카드가 상단. 스크롤 시 접혀 미니 헤더만 고정. 정보 밀도↑ 스크롤↓.">
+            <PageV2_CollapseHeader/>
+          </ArtFrame>
+
+          <ArtFrame id="nav-1" title="C · 카드 스택 네비"
+            caption="<span class='good'>+</span> 드릴다운하면 <strong>카드가 쌓임</strong>. 좌상단 칩으로 한 단계 · 스와이프 → 이전. 계층이 보임.">
+            <NavV1_CardStack/>
+          </ArtFrame>
+
+          <ArtFrame id="nav-2" title="D · Breadcrumb 상단"
+            caption="<span class='good'>+</span> 스크롤 가능한 <strong>빵부스러기 바</strong>. 깊은 계층에서도 한 번에 루트 점프.">
+            <NavV2_Breadcrumb/>
+          </ArtFrame>
+
+          <ArtFrame id="nav-3" title="E · Bottom Sheet Peek"
+            caption="<span class='good'>+</span> 페이지를 <strong>시트로 열고</strong> 끌어내리면 닫힘. 부모 리스트가 뒤에 항상 보여 맥락 유지. 불편함 4번 해결.">
+            <NavV3_BottomSheet/>
+          </ArtFrame>
+        </DCSection>
+
+        {/* ═══════════════ SECTION 6: EVENT CREATE ═══════════════ */}
+        <DCSection id="sec-event" title="N°06 · 일정 등록 — 쉽게">
+
+          <ArtFrame id="ev-1" title="A · 정식 폼"
+            caption="모든 속성을 행으로 나열. 완결성↑ · 속도↓. 복잡한 일정 등록용.">
+            <EventV1_FullForm/>
+          </ArtFrame>
+
+          <ArtFrame id="ev-2" title="B · Quick Capture"
+            caption="<span class='good'>+</span> <strong>자연어 한 줄</strong> — '내일 10am' 자동 파싱. 칩으로 빠른 속성. FAB 탭 후 3초 완료. 불편함 6번 해결.">
+            <EventV2_QuickCapture/>
+          </ArtFrame>
+        </DCSection>
+
+        {/* ═══════════════ SECTION 7: SIDEBAR + EDITOR ═══════════════ */}
+        <DCSection id="sec-misc" title="N°07 · 사이드바 · 블록 에디터">
+
+          <ArtFrame id="side-1" title="A · 슬라이드 사이드바"
+            caption="왼쪽 엣지 스와이프로 열림. 검색 · 즐겨찾기 · DB · Private 섹션. 78% 폭으로 내용 맥락 유지.">
+            <SideV1_SlideOut/>
+          </ArtFrame>
+
+          <ArtFrame id="edit-1" title="B · 블록 에디터"
+            caption="<strong>/ 명령어</strong> · 블록 툴바 · 드래그 핸들. 선택 블록에 엣지 강조. 키보드 위 툴바로 엄지 닿는 곳에서 모두.">
+            <BlockEditV1/>
+          </ArtFrame>
+
+        </DCSection>
+
+      </DCCanvas>
+
+      {/* Tweaks panel */}
+      {editOpen && (
+        <div style={{
+          position: "fixed",
+          right: 16, bottom: 16,
+          width: 260,
+          background: "var(--paper)",
+          border: "1.5px solid var(--ink)",
+          borderRadius: 6,
+          boxShadow: "3px 4px 0 rgba(28,24,19,0.1)",
+          padding: 16,
+          zIndex: 10000,
+          fontFamily: "var(--f-ui)",
+        }}>
+          <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12}}>
+            <div className="hand" style={{fontSize: 16, fontWeight: 700}}>Tweaks</div>
+            <span onClick={() => setEditOpen(false)} style={{cursor: "pointer", fontFamily: "var(--f-hand)", fontSize: 18, color: "var(--ink-3)"}}>×</span>
+          </div>
+
+          <div className="hand-label" style={{fontSize: 10, color: "var(--ink-3)", letterSpacing: "0.08em", marginBottom: 6}}>SKETCHINESS</div>
+          <div style={{display: "flex", gap: 4, marginBottom: 16}}>
+            {["clean","balanced","very"].map(s => (
+              <button key={s} onClick={() => update("sketchiness", s)}
+                className="sk-btn"
+                style={{
+                  flex: 1, padding: "6px 0", fontSize: 11,
+                  background: tw.sketchiness === s ? "var(--ink)" : "var(--paper)",
+                  color: tw.sketchiness === s ? "var(--paper)" : "var(--ink)",
+                  boxShadow: "1px 1px 0 var(--ink)"
+                }}>{s}</button>
+            ))}
+          </div>
+
+          <div className="hand-label" style={{fontSize: 10, color: "var(--ink-3)", letterSpacing: "0.08em", marginBottom: 6}}>ANNOTATIONS</div>
+          <label style={{display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer", marginBottom: 8}}>
+            <input type="checkbox" checked={tw.showAnnotations}
+              onChange={e => update("showAnnotations", e.target.checked)}/>
+            <span className="hand">캡션/주석 표시</span>
+          </label>
+          <label style={{display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer"}}>
+            <input type="checkbox" checked={tw.showBaselines}
+              onChange={e => update("showBaselines", e.target.checked)}/>
+            <span className="hand">기준안(A) 포함</span>
+          </label>
+
+          <hr className="sk-line" style={{margin: "14px 0"}}/>
+          <div className="hand" style={{fontSize: 11, color: "var(--ink-3)"}}>
+            방향 선정 후 → Artiwave 디자인 시스템으로 고-fi 프로토타입 단계로 진행.
+          </div>
+        </div>
+      )}
+
+      {/* Apply annotation/baseline toggles via CSS */}
+      <style>{`
+        ${!tw.showAnnotations ? ".ab-caption { display: none; }" : ""}
+        ${!tw.showBaselines ? `
+          [data-ab-id="home-1"], [data-ab-id="db-1"], [data-ab-id="cal-1"], [data-ab-id="pg-1"] { display: none !important; }
+        ` : ""}
+      `}</style>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+
+</body>
+</html>

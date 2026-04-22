@@ -87,6 +87,8 @@ function pageToWork(page: any): Work {
     category,
     coverColor: CATEGORY_GRADIENTS[category] ?? DEFAULT_GRADIENT,
     status: mapStatus(fallbackSelect || statusName),
+    createdAt: page.created_time ?? null,
+    lastEditedAt: page.last_edited_time ?? null,
     notionUrl: pageUrl(page.id),
   };
 }

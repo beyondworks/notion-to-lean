@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Design System — Notion × iOS 26</title>
+<link rel="stylesheet" href="styles/notion-ios.css"/>
+<style>
+  body { background: var(--n-bg); padding: 48px 32px 96px; max-width: 1100px; margin: 0 auto; }
+  h1.display { font-size: 48px; line-height: 1.1; letter-spacing: -1px; font-weight: 700; margin: 0 0 8px; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--n-text-muted); font-weight: 500; }
+  section { margin: 56px 0; }
+  section > h2 { font-size: 24px; font-weight: 600; margin: 0 0 4px; }
+  section > .desc { color: var(--n-text-muted); font-size: 14px; margin-bottom: 24px; max-width: 640px; }
+  .grid { display: grid; gap: 16px; }
+  .card {
+    background: var(--n-surface); border-radius: 16px; padding: 20px;
+    box-shadow: var(--sh-1); border: 0.5px solid var(--n-border);
+  }
+
+  /* Color swatches */
+  .color-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .swatch { border-radius: 12px; padding: 14px; min-height: 80px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; }
+  .swatch b { font-size: 13px; font-weight: 600; display: block; margin-bottom: 2px; }
+  .swatch code { font-family: var(--f-mono); font-size: 10px; opacity: 0.75; }
+
+  /* Type specimens */
+  .type-row { display: flex; align-items: baseline; gap: 24px; padding: 12px 0; border-bottom: 0.5px solid var(--n-border); }
+  .type-row .meta { width: 140px; flex-shrink: 0; font-size: 11px; color: var(--n-text-muted); font-family: var(--f-mono); }
+  .type-row .sample { flex: 1; }
+
+  /* Tag grid */
+  .tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* Component demos */
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .demo-label { font-size: 11px; color: var(--n-text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+  .demo-phone {
+    background: var(--n-bg-grouped); border-radius: 20px; padding: 16px;
+    border: 0.5px solid var(--n-border);
+  }
+
+  .back-link { position: fixed; top: 20px; left: 24px; z-index: 10;
+    background: var(--n-surface); border: 0.5px solid var(--n-border);
+    padding: 8px 14px; border-radius: 20px;
+    font-size: 13px; font-weight: 500; color: var(--n-text); text-decoration: none;
+    box-shadow: var(--sh-1);
+  }
+  .spacing-demo { display: flex; align-items: flex-end; gap: 4px; }
+  .spacing-box { background: var(--n-accent); border-radius: 4px; }
+  .spacing-label { font-family: var(--f-mono); font-size: 10px; color: var(--n-text-muted); margin-top: 6px; }
+  .shadow-box {
+    width: 100%; aspect-ratio: 16/9; background: var(--n-surface);
+    border-radius: 12px; display: grid; place-items: center;
+    font-family: var(--f-mono); font-size: 11px; color: var(--n-text-muted);
+  }
+</style>
+</head>
+<body>
+
+<a class="back-link" href="Notion Mobile App.html">← 앱으로</a>
+
+<header style="margin-bottom: 48px;">
+  <div class="eyebrow">Design System</div>
+  <h1 class="display">Notion × iOS 26</h1>
+  <p style="color: var(--n-text-muted); max-width: 640px; font-size: 16px; line-height: 1.5; margin: 12px 0 0;">
+    Notion의 뉴트럴한 팔레트와 iOS 26의 그룹드 서피스·리퀴드 글래스 언어를 결합한
+    모바일 전용 디자인 언어. 색은 태그/상태에만 사용하고, 본문은 잉크·페이퍼로 유지합니다.
+  </p>
+</header>
+
+<!-- ── Colors ──────────────────────────────── -->
+<section>
+  <h2>Colors · Surface</h2>
+  <div class="desc">기본 배경은 페이퍼 흰색, 그룹드 리스트는 약간 따뜻한 오프화이트. 액션 컬러는 거의 블랙.</div>
+  <div class="color-row">
+    <div class="swatch" style="background: #FFFFFF; color: #37352F; border: 0.5px solid var(--n-border);"><b>bg</b><code>#FFFFFF</code></div>
+    <div class="swatch" style="background: #F7F6F3; color: #37352F; border: 0.5px solid var(--n-border);"><b>bg-grouped</b><code>#F7F6F3</code></div>
+    <div class="swatch" style="background: #F1F1EF; color: #37352F; border: 0.5px solid var(--n-border);"><b>surface-hover</b><code>#F1F1EF</code></div>
+    <div class="swatch" style="background: #EBEBE9; color: #37352F; border: 0.5px solid var(--n-border);"><b>surface-press</b><code>#EBEBE9</code></div>
+    <div class="swatch" style="background: #37352F; color: #fff;"><b>text</b><code>#37352F</code></div>
+    <div class="swatch" style="background: #2F2F2C; color: #fff;"><b>accent</b><code>#2F2F2C</code></div>
+  </div>
+</section>
+
+<section>
+  <h2>Colors · Notion Tags</h2>
+  <div class="desc">Notion 웹과 동일한 9개 태그. 상태·우선순위·카테고리에만 제한적으로 사용.</div>
+  <div class="tag-grid">
+    <span class="tag tag-gray">gray</span>
+    <span class="tag tag-brown">brown</span>
+    <span class="tag tag-orange">orange</span>
+    <span class="tag tag-yellow">yellow</span>
+    <span class="tag tag-green">green</span>
+    <span class="tag tag-blue">blue</span>
+    <span class="tag tag-purple">purple</span>
+    <span class="tag tag-pink">pink</span>
+    <span class="tag tag-red">red</span>
+  </div>
+</section>
+
+<!-- ── Type ──────────────────────────────── -->
+<section>
+  <h2>Type</h2>
+  <div class="desc">Inter / Pretendard / SF · iOS 인터페이스 스케일 그대로. 모바일에서 본문은 17px 기준.</div>
+  <div class="card">
+    <div class="type-row"><div class="meta">large-title · 34/41 · 700</div><div class="sample t-large-title">안녕하세요, 현우</div></div>
+    <div class="type-row"><div class="meta">title-1 · 28/34 · 700</div><div class="sample t-title-1">Q2 로드맵</div></div>
+    <div class="type-row"><div class="meta">title-2 · 22/28 · 700</div><div class="sample t-title-2">오늘의 일정</div></div>
+    <div class="type-row"><div class="meta">headline · 17/22 · 600</div><div class="sample t-headline">디자인 리뷰</div></div>
+    <div class="type-row"><div class="meta">body · 17/22 · 400</div><div class="sample t-body">이번 분기 목표는 모바일 사용성 개선입니다.</div></div>
+    <div class="type-row"><div class="meta">subhead · 15/20 · 400</div><div class="sample t-subhead">DB 6개 · 이벤트 24개</div></div>
+    <div class="type-row"><div class="meta">footnote · 13/18 · 400</div><div class="sample t-footnote">오늘 오후 2:00 · 강남 A룸</div></div>
+    <div class="type-row" style="border: none;"><div class="meta">caption · 12/16 · upper</div><div class="sample t-caption">오늘 · 2</div></div>
+  </div>
+</section>
+
+<!-- ── Spacing ──────────────────────────────── -->
+<section>
+  <h2>Spacing · Radius · Shadow</h2>
+  <div class="desc">4px 베이스 스케일. iOS 26의 연속적 코너 느낌을 내기 위해 카드는 22–26px 라운드.</div>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="demo-label">Spacing (4px base)</div>
+      <div class="spacing-demo">
+        <div><div class="spacing-box" style="width: 4px; height: 4px;"></div><div class="spacing-label">1</div></div>
+        <div><div class="spacing-box" style="width: 8px; height: 8px;"></div><div class="spacing-label">2</div></div>
+        <div><div class="spacing-box" style="width: 12px; height: 12px;"></div><div class="spacing-label">3</div></div>
+        <div><div class="spacing-box" style="width: 16px; height: 16px;"></div><div class="spacing-label">4</div></div>
+        <div><div class="spacing-box" style="width: 24px; height: 24px;"></div><div class="spacing-label">6</div></div>
+        <div><div class="spacing-box" style="width: 32px; height: 32px;"></div><div class="spacing-label">8</div></div>
+        <div><div class="spacing-box" style="width: 48px; height: 48px;"></div><div class="spacing-label">12</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="demo-label">Radius</div>
+      <div style="display: flex; gap: 12px; align-items: flex-end;">
+        <div><div style="width: 48px; height: 48px; background: var(--n-surface-hover); border-radius: 6px;"></div><div class="spacing-label">xs · 6</div></div>
+        <div><div style="width: 48px; height: 48px; background: var(--n-surface-hover); border-radius: 8px;"></div><div class="spacing-label">sm · 8</div></div>
+        <div><div style="width: 48px; height: 48px; background: var(--n-surface-hover); border-radius: 12px;"></div><div class="spacing-label">md · 12</div></div>
+        <div><div style="width: 48px; height: 48px; background: var(--n-surface-hover); border-radius: 16px;"></div><div class="spacing-label">lg · 16</div></div>
+        <div><div style="width: 48px; height: 48px; background: var(--n-surface-hover); border-radius: 26px;"></div><div class="spacing-label">2xl · 26</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="demo-label">Shadow</div>
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 8px;">
+        <div class="shadow-box" style="box-shadow: var(--sh-1);">sh-1</div>
+        <div class="shadow-box" style="box-shadow: var(--sh-2);">sh-2</div>
+        <div class="shadow-box" style="box-shadow: var(--sh-3);">sh-3</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Components ──────────────────────────────── -->
+<section>
+  <h2>Components</h2>
+  <div class="desc">iOS 그룹드 리스트 + Notion 태그·아이콘 타일을 조합한 합성 컴포넌트.</div>
+
+  <div class="demo-grid">
+    <div>
+      <div class="demo-label">Buttons</div>
+      <div class="demo-phone" style="display: flex; flex-direction: column; gap: 10px;">
+        <button class="btn btn--primary">Primary Action</button>
+        <button class="btn">Secondary</button>
+        <button class="btn btn--ghost">Ghost</button>
+        <button class="btn btn--sm">Small</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="demo-label">Grouped List</div>
+      <div class="demo-phone" style="padding: 0;">
+        <div class="g-header">속성</div>
+        <div class="g-list" style="margin: 0;">
+          <div class="g-row">
+            <div style="flex: 1;" class="t-body">상태</div>
+            <span class="tag tag-blue">진행중</span>
+          </div>
+          <div class="g-row">
+            <div style="flex: 1;" class="t-body">우선순위</div>
+            <span class="tag tag-red">높음</span>
+          </div>
+          <div class="g-row">
+            <div style="flex: 1;" class="t-body">기한</div>
+            <div class="t-body muted">2026-06-30</div>
+            <div class="chev"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="demo-label">Tag / Pill</div>
+      <div class="demo-phone" style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <span class="tag tag-blue">진행중</span>
+        <span class="tag tag-red">● 높음</span>
+        <span class="tag tag-yellow">검토</span>
+        <span class="tag tag-green">완료</span>
+        <span class="tag">#design</span>
+        <span class="tag tag-purple">#product</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="demo-label">Input</div>
+      <div class="demo-phone">
+        <input class="input" placeholder="제목 없음"/>
+        <div style="height: 10px;"></div>
+        <div class="input" style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: var(--n-text-muted);">🔍</span>
+          <span style="flex: 1; color: var(--n-text-placeholder);">무엇이든 검색</span>
+          <span class="kbd">⌘K</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="demo-label">Icon Tile</div>
+      <div class="demo-phone" style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <div class="icon-tile icon-tile--lg" style="background: #DDEDEA; color: #448361;">✓</div>
+        <div class="icon-tile icon-tile--lg" style="background: #DDEBF1; color: #337EA9;">📅</div>
+        <div class="icon-tile icon-tile--lg" style="background: #EAE4F2; color: #9065B0;">◆</div>
+        <div class="icon-tile icon-tile--lg" style="background: #FBF3DB; color: #CB912F;">✎</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="demo-label">Toggle</div>
+      <div class="demo-phone" style="display: flex; gap: 20px; align-items: center;">
+        <button style="width: 51px; height: 31px; border-radius: 16px; background: #34C759; border: none; position: relative;">
+          <span style="position: absolute; top: 2px; left: 22px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+        </button>
+        <button style="width: 51px; height: 31px; border-radius: 16px; background: var(--n-surface-press); border: none; position: relative;">
+          <span style="position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Principles ──────────────────────────────── -->
+<section>
+  <h2>Principles</h2>
+  <div class="demo-grid">
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom: 8px;">01</div>
+      <h3 style="margin: 0 0 8px; font-size: 17px;">세로가 기본이다</h3>
+      <p style="margin: 0; color: var(--n-text-muted); font-size: 14px; line-height: 1.5;">가로 테이블은 카드/리스트로 재설계. 꼭 테이블이 필요하면 제목 컬럼을 sticky로 고정.</p>
+    </div>
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom: 8px;">02</div>
+      <h3 style="margin: 0 0 8px; font-size: 17px;">점이 아니라 제목</h3>
+      <p style="margin: 0; color: var(--n-text-muted); font-size: 14px; line-height: 1.5;">캘린더 월간 셀은 점 대신 짧은 제목. 탭하면 해당 일의 Agenda가 열림.</p>
+    </div>
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom: 8px;">03</div>
+      <h3 style="margin: 0 0 8px; font-size: 17px;">한 줄이면 끝</h3>
+      <p style="margin: 0; color: var(--n-text-muted); font-size: 14px; line-height: 1.5;">일정 추가는 FAB → 자연어 입력. "내일 10시 리뷰"처럼 쳐서 저장.</p>
+    </div>
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom: 8px;">04</div>
+      <h3 style="margin: 0 0 8px; font-size: 17px;">속성은 접는다</h3>
+      <p style="margin: 0; color: var(--n-text-muted); font-size: 14px; line-height: 1.5;">페이지 상단에서 속성이 세로로 쌓여 길어지던 문제. 기본 접힘 + 탭으로 펼침.</p>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

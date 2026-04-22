@@ -33,6 +33,7 @@ export const DB_IDS = {
   INSIGHTS_BRANDING: '247003c7-f7be-803a-83f5-fd9494d24d62',
   INSIGHTS_BUILD: '247003c7-f7be-8074-a583-e1638fd3cfed',
   INSIGHTS_MARKETING: '247003c7-f7be-8035-83f4-d39480d66503',
+  REFLECTION: '31e003c7-f7be-80a0-ab4f-c1e2249f3c24',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,8 @@ export async function queryDatabase(
   // Use REST API directly — SDK v5's dataSources.query hits a different endpoint
   const body: Record<string, unknown> = {};
   if (filter) body.filter = filter;
-  if (sorts) body.sorts = sorts;
+  // Default sort: newest edited first (so all DB views are date-desc consistently)
+  body.sorts = sorts ?? [{ timestamp: 'last_edited_time', direction: 'descending' }];
   body.page_size = 100;
 
   const res = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {

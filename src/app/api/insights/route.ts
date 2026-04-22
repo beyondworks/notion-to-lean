@@ -72,6 +72,7 @@ function pageToInsight(page: any): Insight {
     coverColor: CATEGORY_GRADIENTS[category] ?? DEFAULT_GRADIENT,
     tags,
     date,
+    createdAt: page.created_time ?? null,
     lastEditedAt: page.last_edited_time ?? undefined,
     notionUrl: pageUrl(page.id),
   };

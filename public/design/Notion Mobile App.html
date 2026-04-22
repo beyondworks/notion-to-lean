@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Notion Mobile · iOS 26</title>
+<link rel="stylesheet" href="styles/notion-ios.css"/>
+<style>
+  html, body { min-height: 100vh; }
+  body {
+    background: radial-gradient(1200px 700px at 50% 0%, #F1EEE7 0%, #E8E3D8 55%, #DDD6C7 100%);
+    overflow-x: hidden;
+    font-family: var(--f-ui);
+  }
+  [data-theme="dark"] body {
+    background: radial-gradient(1200px 700px at 50% 0%, #262626 0%, #181818 55%, #0E0E0E 100%);
+  }
+  .stage {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 20px 60px;
+    gap: 48px;
+    flex-wrap: wrap;
+  }
+  .stage-label {
+    position: fixed; top: 16px; left: 20px; z-index: 100;
+    display: flex; gap: 8px; align-items: center;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(16px);
+    padding: 8px 14px; border-radius: 20px;
+    box-shadow: var(--sh-1);
+    font-size: 13px; font-weight: 500; color: var(--n-text);
+  }
+  [data-theme="dark"] .stage-label { background: rgba(35,35,35,0.72); color: var(--n-text); }
+  .toolbar {
+    position: fixed; top: 16px; right: 20px; z-index: 100;
+    display: flex; gap: 8px; align-items: center;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(16px);
+    padding: 6px 6px 6px 14px; border-radius: 22px;
+    box-shadow: var(--sh-1);
+    font-size: 13px; color: var(--n-text);
+  }
+  [data-theme="dark"] .toolbar { background: rgba(35,35,35,0.72); }
+  .tool-btn {
+    border: none; background: var(--n-surface-hover); color: var(--n-text);
+    padding: 6px 12px; border-radius: 16px; font-size: 12px; cursor: pointer;
+    font-weight: 500;
+  }
+  .tool-btn.on { background: var(--n-accent); color: var(--n-bg); }
+  select.tool-btn { padding-right: 22px; }
+
+  .screen-picker {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 100;
+    display: flex; gap: 4px; padding: 5px; border-radius: 24px;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(18px);
+    box-shadow: var(--sh-2);
+    overflow-x: auto; max-width: calc(100vw - 40px);
+  }
+  [data-theme="dark"] .screen-picker { background: rgba(35,35,35,0.78); }
+  .screen-picker::-webkit-scrollbar { display: none; }
+  .screen-btn {
+    border: none; background: transparent; color: var(--n-text-muted);
+    font-family: var(--f-ui);
+    padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    transition: all var(--d-fast);
+  }
+  .screen-btn.on { background: var(--n-accent); color: var(--n-bg); }
+
+  /* Tweaks panel */
+  .tweaks-panel {
+    position: fixed; right: 20px; bottom: 80px; z-index: 100;
+    width: 280px;
+    background: var(--n-surface);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: var(--sh-3);
+    display: none;
+    font-size: 13px;
+  }
+  .tweaks-panel.show { display: block; }
+  .tweaks-panel h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--n-text-strong); }
+  .tweak-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; gap: 8px; }
+
+  /* ── Mobile: strip desktop-preview chrome ────────────── */
+  @media (max-width: 500px) {
+    body { overflow: hidden; }
+    .stage { padding: 0; gap: 0; min-height: 0; }
+    .stage-label, .toolbar, .screen-picker { display: none !important; }
+    #phone-root { width: 100vw; height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage-label">
+  <span>◆ Notion × iOS 26</span>
+  <span style="color: var(--n-text-muted);">· <span id="screen-name">홈</span></span>
+</div>
+
+<div class="toolbar">
+  <button class="tool-btn" id="theme-btn">🌙 다크</button>
+  <a class="tool-btn" href="Design System.html" style="text-decoration: none;">DS</a>
+  <a class="tool-btn" href="Notion Mobile Wireframes.html" style="text-decoration: none;">와이어</a>
+</div>
+
+<div class="stage">
+  <div id="phone-root"></div>
+</div>
+
+<div class="screen-picker" id="screen-picker"></div>
+
+<div class="tweaks-panel" id="tweaks-panel">
+  <h4>Tweaks</h4>
+  <div class="tweak-row">
+    <span>다크 모드</span>
+    <label class="switch"><input type="checkbox" id="tw-dark"/></label>
+  </div>
+  <div class="tweak-row">
+    <span>배경 그라데이션</span>
+    <label class="switch"><input type="checkbox" id="tw-bg" checked/></label>
+  </div>
+  <div class="tweak-row">
+    <span>프레임 표시</span>
+    <label class="switch"><input type="checkbox" id="tw-frame" checked/></label>
+  </div>
+</div>
+
+<!-- React -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="src/app-shared.jsx"></script>
+<script type="text/babel" src="src/app-screens-1.jsx"></script>
+<script type="text/babel" src="src/app-screens-2.jsx"></script>
+<script type="text/babel" src="src/app-screens-3.jsx"></script>
+
+<script type="text/babel">
+const SCREENS = [
+  { k: "home",         label: "홈" },
+  { k: "calendar",     label: "캘린더" },
+  { k: "db-list",      label: "DB · 태스크" },
+  { k: "page",         label: "페이지" },
+  { k: "event-edit",   label: "일정 등록" },
+  { k: "search",       label: "검색" },
+  { k: "onboarding",   label: "온보딩" },
+  { k: "token",        label: "API 연결" },
+  { k: "db-picker",    label: "DB 선택" },
+  { k: "settings",     label: "설정" },
+];
+
+function App() {
+  const [screen, setScreen] = React.useState(() => localStorage.getItem("nm-screen") || "home");
+  const [ctx, setCtx] = React.useState({});
+  const [history, setHistory] = React.useState([]); // stack of {screen, ctx}
+  const [dark, setDark] = React.useState(() => localStorage.getItem("nm-dark") === "1");
+
+  React.useEffect(() => { localStorage.setItem("nm-screen", screen); }, [screen]);
+  React.useEffect(() => {
+    localStorage.setItem("nm-dark", dark ? "1" : "0");
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    const btn = document.getElementById("theme-btn");
+    if (btn) btn.textContent = dark ? "☀ 라이트" : "🌙 다크";
+    const cb = document.getElementById("tw-dark");
+    if (cb) cb.checked = dark;
+  }, [dark]);
+
+  React.useEffect(() => {
+    document.getElementById("screen-name").textContent = SCREENS.find(s => s.k === screen)?.label || screen;
+    // Paint screen picker
+    const pick = document.getElementById("screen-picker");
+    pick.innerHTML = "";
+    SCREENS.forEach(s => {
+      const b = document.createElement("button");
+      b.className = "screen-btn" + (s.k === screen ? " on" : "");
+      b.textContent = s.label;
+      b.onclick = () => setScreen(s.k);
+      pick.appendChild(b);
+    });
+  }, [screen]);
+
+  // Wire theme button
+  React.useEffect(() => {
+    const btn = document.getElementById("theme-btn");
+    const handler = () => setDark(d => !d);
+    btn?.addEventListener("click", handler);
+    const cb = document.getElementById("tw-dark");
+    const cbh = e => setDark(e.target.checked);
+    cb?.addEventListener("change", cbh);
+    return () => { btn?.removeEventListener("click", handler); cb?.removeEventListener("change", cbh); };
+  }, []);
+
+  const go = (k, nextCtx = {}) => {
+    // push current onto history before navigating
+    setHistory(h => [...h, {screen, ctx}].slice(-20)); // cap at 20
+    setCtx(nextCtx || {});
+    setScreen(k);
+  };
+
+  const goBack = () => {
+    setHistory(h => {
+      if (h.length === 0) {
+        // No history → go home
+        setCtx({});
+        setScreen("home");
+        return h;
+      }
+      const prev = h[h.length - 1];
+      setCtx(prev.ctx || {});
+      setScreen(prev.screen);
+      return h.slice(0, -1);
+    });
+  };
+
+  let body;
+  switch (screen) {
+    case "onboarding": body = <OnboardingScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "token":      body = <TokenScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "db-picker":  body = <DbPickerScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "home":       body = <HomeScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "search":     body = <SearchScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "db-list":    body = <DbListScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "calendar":   body = <CalendarScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "page":       body = <PageScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "event-edit": body = <EventEditScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "settings":   body = <SettingsScreen go={go} goBack={goBack} ctx={ctx} dark={dark} setDark={setDark}/>; break;
+    default:           body = <HomeScreen go={go} goBack={goBack} ctx={ctx}/>;
+  }
+  return <Phone>{body}</Phone>;
+}
+
+ReactDOM.createRoot(document.getElementById("phone-root")).render(<App/>);
+</script>
+
+<script>
+// Edit Mode protocol — Tweaks
+(function() {
+  const TWEAK_DEFAULS = /*EDITMODE-BEGIN*/{
+    "dark": false,
+    "showBgGradient": true,
+    "showFrame": true
+  }/*EDITMODE-END*/;
+
+  const panel = document.getElementById("tweaks-panel");
+  window.addEventListener("message", (e) => {
+    if (!e.data || typeof e.data !== "object") return;
+    if (e.data.type === "__activate_edit_mode") panel.classList.add("show");
+    if (e.data.type === "__deactivate_edit_mode") panel.classList.remove("show");
+  });
+  window.parent.postMessage({type: "__edit_mode_available"}, "*");
+})();
+</script>
+
+</body>
+</html>
