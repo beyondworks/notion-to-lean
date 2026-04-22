@@ -1,6 +1,28 @@
 import { NextResponse } from 'next/server';
 import { isNotionEnabled, createPage, pageUrl } from '@/lib/notion';
 
+// Fetch a database's schema (REST) — we need this to discover the title property name
+async function getDatabaseSchema(dbId: string): Promise<Record<string, any> | null> {
+  const apiKey = process.env.NOTION_API_KEY;
+  if (!apiKey) return null;
+  const res = await fetch(`https://api.notion.com/v1/databases/${dbId}`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Notion-Version': '2022-06-28',
+    },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.properties ?? null;
+}
+
+function findTitleProperty(schema: Record<string, any>): string | null {
+  for (const [name, def] of Object.entries(schema)) {
+    if ((def as any)?.type === 'title') return name;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/pages — Create a new page in a Notion database
 // ---------------------------------------------------------------------------
@@ -29,9 +51,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Discover the correct title property name for this DB (e.g., "Entry name", "Name", "Title")
+    const schema = await getDatabaseSchema(body.dbId);
+    const titleKey = schema ? findTitleProperty(schema) : null;
+    if (!titleKey) {
+      return NextResponse.json({ error: 'Database has no title property' }, { status: 500 });
+    }
+
     const properties: Record<string, unknown> = {
       ...(body.properties ?? {}),
-      Name: { title: [{ text: { content: body.title } }] },
+      [titleKey]: { title: [{ text: { content: body.title } }] },
     };
 
     const pageId = await createPage(body.dbId, properties);

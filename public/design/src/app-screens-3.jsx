@@ -107,6 +107,58 @@ function BlockRenderer({ b, idx, checks, toggleCheck, depth = 0 }) {
     );
   }
 
+  if ((b.type === "bookmark" || b.type === "embed" || b.type === "link_preview") && b.url) {
+    let host = "";
+    try { host = new URL(b.url).hostname.replace(/^www\./, ""); } catch {}
+    return (
+      <a href={b.url} target="_blank" rel="noreferrer" style={{
+        display: "block", margin: "12px 0", marginLeft: indent,
+        textDecoration: "none", color: "inherit",
+      }}>
+        <div style={{
+          background: "var(--n-surface)",
+          border: "1px solid var(--n-border)",
+          borderRadius: 10,
+          padding: "12px 14px",
+          overflow: "hidden",
+        }}>
+          <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 4}}>
+            <Icon name="share" size={14} color="var(--n-text-muted)"/>
+            <span className="t-caption">{host || b.type}</span>
+          </div>
+          <div className="t-body" style={{fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+            {b.url}
+          </div>
+          {b.caption && <div className="t-footnote" style={{marginTop: 4}}>{b.caption}</div>}
+        </div>
+      </a>
+    );
+  }
+
+  if (b.type === "video" && b.videoUrl) {
+    return (
+      <div style={{margin: "12px 0", marginLeft: indent}}>
+        <video src={b.videoUrl} controls style={{width: "100%", borderRadius: 8, display: "block"}}/>
+      </div>
+    );
+  }
+
+  if (b.type === "file" && b.fileUrl) {
+    return (
+      <a href={b.fileUrl} target="_blank" rel="noreferrer" style={{
+        display: "flex", alignItems: "center", gap: 10,
+        margin: "8px 0", marginLeft: indent,
+        padding: "10px 12px", background: "var(--n-surface-hover)",
+        borderRadius: 8, textDecoration: "none", color: "var(--n-text)",
+      }}>
+        <Icon name="archive" size={16} color="var(--n-text-muted)"/>
+        <span className="t-body" style={{flex: 1, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+          {b.fileName || b.content || "파일"}
+        </span>
+      </a>
+    );
+  }
+
   if (b.type === "table" && Array.isArray(b.children)) {
     const rows = b.children;
     return (
@@ -239,12 +291,8 @@ function PageScreen({ go, goBack, ctx }) {
 
   const pageId = ctx?.id;
 
-  uE3(() => {
-    if (!pageId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const fetchPage = React.useCallback(() => {
+    if (!pageId) return;
     Promise.all([
       fetch(`/api/pages/${pageId}`).then(r => r.ok ? r.json() : null).catch(() => null),
       fetch(`/api/pages/${pageId}/blocks`).then(r => r.ok ? r.json() : null).catch(() => null),
@@ -261,6 +309,15 @@ function PageScreen({ go, goBack, ctx }) {
       setLoading(false);
     });
   }, [pageId]);
+  uE3(() => {
+    if (!pageId) { setLoading(false); return; }
+    setLoading(true);
+    fetchPage();
+    const onVis = () => { if (!document.hidden) fetchPage(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", fetchPage);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", fetchPage); };
+  }, [pageId, fetchPage]);
 
   const toggleCheck = async (blockId) => {
     const next = !checks[blockId];
@@ -407,7 +464,7 @@ function PageScreen({ go, goBack, ctx }) {
         </div>
       </div>
 
-      <div style={{flex: 1, overflowY: "auto", background: "var(--n-bg)"}}>
+      <div style={{flex: 1, overflowY: "auto", background: "var(--n-bg)"}} className="scroll-fade">
         {/* Cover (only if Notion has one) */}
         {cover && (
           <div style={{height: 140, position: "relative"}}>
@@ -506,7 +563,7 @@ function PageScreen({ go, goBack, ctx }) {
         </div>
       </div>
 
-      <TabBar active={0} onChange={i => i === 0 && go("home")}/>
+      <TabBar active={0} onChange={i => { if (i === 0) go("home"); else if (i === 1) go("search"); else if (i === 2) go("event-edit"); else if (i === 3) go("inbox"); else if (i === 4) go("settings"); }}/>
     </>
   );
 }
@@ -564,7 +621,7 @@ function EventEditScreen({ go, goBack, ctx }) {
       {/* Dim backdrop */}
       <div style={{
         position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 20,
-      }} onClick={() => go("home")}/>
+      }} onClick={() => goBack ? goBack() : go("home")}/>
 
       {/* Sheet */}
       <div style={{
@@ -580,7 +637,7 @@ function EventEditScreen({ go, goBack, ctx }) {
         </div>
         {/* Sheet nav */}
         <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 16px 8px"}}>
-          <button className="btn btn--ghost btn--sm" onClick={() => go("home")} style={{padding: "6px 4px"}}>취소</button>
+          <button className="btn btn--ghost btn--sm" onClick={() => goBack ? goBack() : go("home")} style={{padding: "6px 4px"}}>취소</button>
           <div className="t-headline">{saveError ? "저장 실패" : saving ? "저장 중..." : `새 ${dbLabel}`}</div>
           <button className="btn btn--sm btn--primary" onClick={handleSave} disabled={!title.trim() || saving} style={{padding: "6px 14px", opacity: (!title.trim() || saving) ? 0.4 : 1}}>{saving ? "저장중" : "저장"}</button>
         </div>
@@ -671,14 +728,89 @@ function EventEditScreen({ go, goBack, ctx }) {
 }
 
 /* ── Settings ──────────────────────────────────────── */
-function SettingsScreen({ go, dark, setDark }) {
+function SettingsScreen({ go, goBack, dark, setDark }) {
   const [connected, setConnected] = uS3(null);
+  const [profileName] = uS3(() => localStorage.getItem("nm-profile-name") || "효율");
+  const [profileWorkspace] = uS3(() => localStorage.getItem("nm-profile-workspace") || "Beyondworks");
+  const [profilePlan] = uS3(() => localStorage.getItem("nm-profile-plan") || "Pro");
+  const [fontSize, setFontSize] = uS3(() => localStorage.getItem("nm-font-size") || "기본");
+  const [language, setLanguage] = uS3(() => localStorage.getItem("nm-lang") || "한국어");
+  const [offline, setOffline] = uS3(() => localStorage.getItem("nm-offline") !== "0");
+  const [notify, setNotify] = uS3(() => localStorage.getItem("nm-notify") === "1");
+  const [cacheSize, setCacheSize] = uS3("—");
+
   uE3(() => {
     fetch("/api/tasks")
       .then(r => r.ok ? r.json() : { mock: true })
       .then(j => setConnected(!j.mock))
       .catch(() => setConnected(false));
+    // Estimate cache
+    if (navigator.storage?.estimate) {
+      navigator.storage.estimate().then(est => {
+        const mb = ((est.usage || 0) / 1024 / 1024).toFixed(1);
+        setCacheSize(`${mb} MB`);
+      });
+    }
   }, []);
+
+  // Apply font size via data-font-size attribute (drives CSS var overrides)
+  uE3(() => {
+    if (fontSize === "기본") {
+      document.documentElement.removeAttribute("data-font-size");
+    } else {
+      document.documentElement.setAttribute("data-font-size", fontSize);
+    }
+    localStorage.setItem("nm-font-size", fontSize);
+  }, [fontSize]);
+
+  uE3(() => {
+    const prev = localStorage.getItem("nm-lang") || "한국어";
+    localStorage.setItem("nm-lang", language);
+    document.documentElement.setAttribute("lang", language === "English" ? "en" : "ko");
+    // Force re-render via location reload once language actually changes
+    if (prev !== language) {
+      // defer to let the button press settle
+      setTimeout(() => window.location.reload(), 120);
+    }
+  }, [language]);
+  uE3(() => { localStorage.setItem("nm-offline", offline ? "1" : "0"); }, [offline]);
+
+  const cycleFontSize = () => {
+    const opts = ["작게", "기본", "크게", "아주 크게"];
+    const i = opts.indexOf(fontSize);
+    setFontSize(opts[(i + 1) % opts.length]);
+  };
+  const cycleLanguage = () => {
+    const opts = ["한국어", "English"];
+    const i = opts.indexOf(language);
+    setLanguage(opts[(i + 1) % opts.length]);
+  };
+  const handleNotify = (v) => {
+    if (v && "Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission().then(p => {
+        const ok = p === "granted";
+        setNotify(ok);
+        localStorage.setItem("nm-notify", ok ? "1" : "0");
+        if (!ok) alert("알림 권한이 필요합니다. 브라우저 설정에서 허용해주세요.");
+      });
+    } else {
+      setNotify(v);
+      localStorage.setItem("nm-notify", v ? "1" : "0");
+    }
+  };
+  const clearCache = () => {
+    if (!confirm("로컬 캐시와 설정(테마 제외)을 모두 지웁니다. 계속하시겠어요?")) return;
+    const keepKeys = ["nm-dark"];
+    const kept = {};
+    keepKeys.forEach(k => { kept[k] = localStorage.getItem(k); });
+    localStorage.clear();
+    Object.entries(kept).forEach(([k, v]) => v !== null && localStorage.setItem(k, v));
+    if (caches && caches.keys) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
+    alert("캐시를 비웠습니다.");
+    setCacheSize("0 MB");
+  };
   const statusText = connected === null ? "확인 중..." : connected ? "연결됨 · 실시간 동기화" : "Demo 모드 · 토큰 필요";
   const statusBg = connected ? "#DDEDEA" : "#FDEBEC";
   const statusFg = connected ? "#448361" : "#D44C47";
@@ -686,17 +818,19 @@ function SettingsScreen({ go, dark, setDark }) {
 
   return (
     <>
-      <NavBar title="설정" subtitle="현우's workspace"
+      <NavBar title="설정" subtitle={`${profileName}'s workspace`}
         left={<NavIconBtn icon="back" onClick={goBack}/>}
       />
-      <div style={{flex: 1, overflowY: "auto"}}>
+      <div style={{flex: 1, overflowY: "auto"}} className="scroll-fade">
         {/* Account card */}
         <div style={{padding: "4px 16px 16px"}}>
-          <div style={{background: "var(--n-surface)", borderRadius: 22, padding: 16, display: "flex", alignItems: "center", gap: 14, boxShadow: "var(--sh-1)"}}>
-            <Avatar name="H" size={52}/>
+          <div onClick={() => go("profile")}
+            className="g-row--tap"
+            style={{background: "var(--n-surface)", borderRadius: 22, padding: 16, display: "flex", alignItems: "center", gap: 14, boxShadow: "var(--sh-1)", cursor: "pointer"}}>
+            <Avatar name={profileName} size={52}/>
             <div style={{flex: 1}}>
-              <div className="t-headline">현우</div>
-              <div className="t-footnote">Beyondworks · Pro</div>
+              <div className="t-headline">{profileName}</div>
+              <div className="t-footnote">{profileWorkspace} · {profilePlan}</div>
             </div>
             <div className="chev"/>
           </div>
@@ -712,10 +846,18 @@ function SettingsScreen({ go, dark, setDark }) {
             </div>
             <div className="chev"/>
           </div>
+          <div className="g-row g-row--with-icon g-row--tap" onClick={() => go("db-picker")} style={{cursor: "pointer"}}>
+            <div className="icon-tile" style={{background: "var(--n-surface-hover)"}}>◆</div>
+            <div style={{flex: 1}}>
+              <div className="t-body">표시할 DB 선택</div>
+              <div className="t-footnote">홈 shelf에 핀할 DB</div>
+            </div>
+            <div className="chev"/>
+          </div>
           <div className="g-row g-row--with-icon">
             <div className="icon-tile">🔔</div>
             <div style={{flex: 1}}><div className="t-body">알림</div></div>
-            <div className="chev"/>
+            <Toggle on={notify} onChange={handleNotify}/>
           </div>
         </div>
 
@@ -726,16 +868,16 @@ function SettingsScreen({ go, dark, setDark }) {
             <div style={{flex: 1}} className="t-body">다크 모드</div>
             <Toggle on={dark} onChange={setDark}/>
           </div>
-          <div className="g-row g-row--with-icon">
+          <div className="g-row g-row--with-icon g-row--tap" onClick={cycleFontSize} style={{cursor: "pointer"}}>
             <div className="icon-tile">Aa</div>
             <div style={{flex: 1}} className="t-body">글자 크기</div>
-            <div className="t-body" style={{color: "var(--n-text-muted)"}}>기본</div>
+            <div className="t-body" style={{color: "var(--n-text-muted)"}}>{fontSize}</div>
             <div className="chev"/>
           </div>
-          <div className="g-row g-row--with-icon">
+          <div className="g-row g-row--with-icon g-row--tap" onClick={cycleLanguage} style={{cursor: "pointer"}}>
             <div className="icon-tile">🌐</div>
             <div style={{flex: 1}} className="t-body">언어</div>
-            <div className="t-body" style={{color: "var(--n-text-muted)"}}>한국어</div>
+            <div className="t-body" style={{color: "var(--n-text-muted)"}}>{language}</div>
             <div className="chev"/>
           </div>
         </div>
@@ -745,12 +887,12 @@ function SettingsScreen({ go, dark, setDark }) {
           <div className="g-row g-row--with-icon">
             <div className="icon-tile">📥</div>
             <div style={{flex: 1}} className="t-body">오프라인 저장</div>
-            <Toggle on={true} onChange={()=>{}}/>
+            <Toggle on={offline} onChange={setOffline}/>
           </div>
-          <div className="g-row g-row--with-icon">
+          <div className="g-row g-row--with-icon g-row--tap" onClick={clearCache} style={{cursor: "pointer"}}>
             <div className="icon-tile">🗑</div>
             <div style={{flex: 1}} className="t-body">캐시 비우기</div>
-            <div className="t-footnote">12.4 MB</div>
+            <div className="t-footnote">{cacheSize}</div>
           </div>
         </div>
 
@@ -760,9 +902,132 @@ function SettingsScreen({ go, dark, setDark }) {
 
         <TabSpacer/>
       </div>
-      <TabBar active={4} onChange={i => i === 0 && go("home")}/>
+      <TabBar active={4} onChange={i => { if (i === 0) go("home"); else if (i === 1) go("search"); else if (i === 2) go("event-edit"); else if (i === 3) go("inbox"); else if (i === 4) go("settings"); }}/>
     </>
   );
 }
 
-Object.assign(window, { PageScreen, EventEditScreen, SettingsScreen });
+
+/* ── Profile: 이름/워크스페이스/아바타 편집 + 사이닝아웃 ────────── */
+function ProfileScreen({ go, goBack }) {
+  const [name, setName] = uS3(() => localStorage.getItem("nm-profile-name") || "효율");
+  const [workspace, setWorkspace] = uS3(() => localStorage.getItem("nm-profile-workspace") || "Beyondworks");
+  const [plan, setPlan] = uS3(() => localStorage.getItem("nm-profile-plan") || "Pro");
+  const [avatar, setAvatar] = uS3(() => localStorage.getItem("nm-profile-avatar") || "");
+  const [saved, setSaved] = uS3(false);
+
+  const save = () => {
+    localStorage.setItem("nm-profile-name", name.trim() || "효율");
+    localStorage.setItem("nm-profile-workspace", workspace.trim() || "Beyondworks");
+    localStorage.setItem("nm-profile-plan", plan);
+    localStorage.setItem("nm-profile-avatar", avatar);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1200);
+  };
+
+  const resetAll = () => {
+    if (!confirm("모든 로컬 설정을 초기화합니다 (Notion 연결 제외). 계속하시겠어요?")) return;
+    const keepKeys = ["nm-profile-name"]; // preserve name only
+    const kept = {};
+    keepKeys.forEach(k => kept[k] = localStorage.getItem(k));
+    localStorage.clear();
+    Object.entries(kept).forEach(([k, v]) => v !== null && localStorage.setItem(k, v));
+    document.documentElement.removeAttribute("data-theme");
+    window.location.reload();
+  };
+
+  const signOut = () => {
+    if (!confirm("로그아웃하면 Notion 토큰 설정 화면으로 이동합니다.")) return;
+    go("token");
+  };
+
+  return (
+    <>
+      <NavBar title="프로필" large={false}
+        left={<NavIconBtn icon="back" onClick={goBack}/>}
+        right={<button className="btn btn--sm btn--primary" onClick={save} style={{padding: "6px 14px"}}>{saved ? "✓ 저장됨" : "저장"}</button>}
+      />
+      <div style={{flex: 1, overflowY: "auto"}} className="scroll-fade">
+        {/* Avatar */}
+        <div style={{padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14}}>
+          <div style={{
+            width: 88, height: 88, borderRadius: 44,
+            background: avatar ? "transparent" : "var(--n-tag-blue-fg)",
+            display: "grid", placeItems: "center",
+            color: "#fff", fontSize: 36, fontWeight: 600,
+            overflow: "hidden",
+          }}>
+            {avatar && /^https?:\/\//.test(avatar) ? (
+              <img src={avatar} alt="" style={{width: "100%", height: "100%", objectFit: "cover"}}/>
+            ) : avatar ? (
+              <span style={{fontSize: 44, lineHeight: 1}}>{avatar}</span>
+            ) : (
+              (name || "효").slice(0, 1).toUpperCase()
+            )}
+          </div>
+          <div className="t-footnote muted">아래 "아바타"에 이모지 또는 이미지 URL 입력</div>
+        </div>
+
+        <div className="g-header">계정 정보</div>
+        <div className="g-list">
+          <div className="g-row" style={{padding: "14px 16px", alignItems: "flex-start"}}>
+            <div style={{width: 80, color: "var(--n-text-muted)", fontSize: 13, flexShrink: 0, paddingTop: 6}}>이름</div>
+            <input
+              value={name} onChange={e => setName(e.target.value)}
+              placeholder="효율"
+              style={{flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 17, color: "var(--n-text)", fontFamily: "inherit", padding: "4px 0"}}
+            />
+          </div>
+          <div className="g-row" style={{padding: "14px 16px", alignItems: "flex-start"}}>
+            <div style={{width: 80, color: "var(--n-text-muted)", fontSize: 13, flexShrink: 0, paddingTop: 6}}>워크스페이스</div>
+            <input
+              value={workspace} onChange={e => setWorkspace(e.target.value)}
+              placeholder="Beyondworks"
+              style={{flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 17, color: "var(--n-text)", fontFamily: "inherit", padding: "4px 0"}}
+            />
+          </div>
+          <div className="g-row" style={{padding: "14px 16px", alignItems: "flex-start"}}>
+            <div style={{width: 80, color: "var(--n-text-muted)", fontSize: 13, flexShrink: 0, paddingTop: 6}}>아바타</div>
+            <input
+              value={avatar} onChange={e => setAvatar(e.target.value)}
+              placeholder="🌱 또는 https://..."
+              style={{flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 17, color: "var(--n-text)", fontFamily: "inherit", padding: "4px 0"}}
+            />
+          </div>
+          <div className="g-row" style={{padding: "14px 16px"}}>
+            <div style={{width: 80, color: "var(--n-text-muted)", fontSize: 13, flexShrink: 0}}>요금제</div>
+            <div style={{flex: 1, display: "flex", gap: 6}}>
+              {["Free", "Plus", "Pro", "Team"].map(p => (
+                <button key={p} onClick={() => setPlan(p)} style={{
+                  padding: "6px 12px", borderRadius: 14, border: "none",
+                  background: plan === p ? "var(--n-accent)" : "var(--n-surface-hover)",
+                  color: plan === p ? "var(--n-bg)" : "var(--n-text)",
+                  fontSize: 13, fontWeight: 500, cursor: "pointer",
+                }}>{p}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="g-header" style={{marginTop: 18}}>고급</div>
+        <div className="g-list">
+          <div className="g-row g-row--tap" onClick={resetAll} style={{cursor: "pointer", color: "var(--n-tag-red-fg)"}}>
+            <Icon name="sync" size={18} color="var(--n-tag-red-fg)"/>
+            <div style={{flex: 1}} className="t-body" style={{flex: 1, color: "var(--n-tag-red-fg)"}}>모든 로컬 설정 초기화</div>
+          </div>
+          <div className="g-row g-row--tap" onClick={signOut} style={{cursor: "pointer", color: "var(--n-tag-red-fg)"}}>
+            <Icon name="lock" size={18} color="var(--n-tag-red-fg)"/>
+            <div className="t-body" style={{flex: 1, color: "var(--n-tag-red-fg)"}}>Notion 연결 끊기 / 재연결</div>
+          </div>
+        </div>
+
+        <div style={{padding: "24px 20px", textAlign: "center"}}>
+          <div className="t-footnote muted">변경사항은 이 기기에만 저장됩니다.</div>
+        </div>
+        <TabSpacer/>
+      </div>
+    </>
+  );
+}
+
+Object.assign(window, { PageScreen, EventEditScreen, SettingsScreen, ProfileScreen });

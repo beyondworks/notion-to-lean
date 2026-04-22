@@ -60,6 +60,33 @@ async function mapBlockRecursive(block: any): Promise<any> {
     base.language = block.code?.language ?? 'plain text';
   }
 
+  if (block.type === 'bookmark') {
+    base.url = block.bookmark?.url ?? '';
+    base.caption = Array.isArray(block.bookmark?.caption)
+      ? block.bookmark.caption.map((t: any) => t.plain_text).join('')
+      : '';
+  }
+
+  if (block.type === 'embed') {
+    base.url = block.embed?.url ?? '';
+    base.caption = Array.isArray(block.embed?.caption)
+      ? block.embed.caption.map((t: any) => t.plain_text).join('')
+      : '';
+  }
+
+  if (block.type === 'link_preview') {
+    base.url = block.link_preview?.url ?? '';
+  }
+
+  if (block.type === 'video') {
+    base.videoUrl = block.video?.external?.url ?? block.video?.file?.url ?? null;
+  }
+
+  if (block.type === 'file') {
+    base.fileUrl = block.file?.external?.url ?? block.file?.file?.url ?? null;
+    base.fileName = block.file?.name ?? '';
+  }
+
   if (block.type === 'child_database') {
     base.databaseTitle = block.child_database?.title ?? '';
     // block.id is the database id — query for entries (top 20)

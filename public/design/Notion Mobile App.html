@@ -149,7 +149,9 @@ const SCREENS = [
   { k: "onboarding",   label: "온보딩" },
   { k: "token",        label: "API 연결" },
   { k: "db-picker",    label: "DB 선택" },
+  { k: "inbox",        label: "인박스" },
   { k: "settings",     label: "설정" },
+  { k: "profile",      label: "프로필" },
 ];
 
 function App() {
@@ -159,6 +161,14 @@ function App() {
   const [dark, setDark] = React.useState(() => localStorage.getItem("nm-dark") === "1");
 
   React.useEffect(() => { localStorage.setItem("nm-screen", screen); }, [screen]);
+
+  // Apply stored UI prefs on mount
+  React.useEffect(() => {
+    const fs = localStorage.getItem("nm-font-size");
+    if (fs && fs !== "기본") document.documentElement.setAttribute("data-font-size", fs);
+    const lang = localStorage.getItem("nm-lang") || "한국어";
+    document.documentElement.setAttribute("lang", lang === "English" ? "en" : "ko");
+  }, []);
   React.useEffect(() => {
     localStorage.setItem("nm-dark", dark ? "1" : "0");
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
@@ -220,13 +230,15 @@ function App() {
     case "onboarding": body = <OnboardingScreen go={go} goBack={goBack} ctx={ctx}/>; break;
     case "token":      body = <TokenScreen go={go} goBack={goBack} ctx={ctx}/>; break;
     case "db-picker":  body = <DbPickerScreen go={go} goBack={goBack} ctx={ctx}/>; break;
-    case "home":       body = <HomeScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "home":       body = <HomeScreen go={go} goBack={goBack} ctx={ctx} dark={dark} setDark={setDark}/>; break;
     case "search":     body = <SearchScreen go={go} goBack={goBack} ctx={ctx}/>; break;
     case "db-list":    body = <DbListScreen go={go} goBack={goBack} ctx={ctx}/>; break;
     case "calendar":   body = <CalendarScreen go={go} goBack={goBack} ctx={ctx}/>; break;
     case "page":       body = <PageScreen go={go} goBack={goBack} ctx={ctx}/>; break;
     case "event-edit": body = <EventEditScreen go={go} goBack={goBack} ctx={ctx}/>; break;
+    case "inbox":      body = <InboxScreen go={go} goBack={goBack} ctx={ctx}/>; break;
     case "settings":   body = <SettingsScreen go={go} goBack={goBack} ctx={ctx} dark={dark} setDark={setDark}/>; break;
+    case "profile":    body = <ProfileScreen go={go} goBack={goBack} ctx={ctx}/>; break;
     default:           body = <HomeScreen go={go} goBack={goBack} ctx={ctx}/>;
   }
   return <Phone>{body}</Phone>;

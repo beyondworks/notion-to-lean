@@ -133,8 +133,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Try common property names for the checkbox
-    const propertyNames = ['Done', '완료', 'Checkbox', '체크박스', 'Status Check'];
+    // Try common property names for the checkbox (Beyond_Tasks uses "Completed")
+    const propertyNames = ['Completed', 'Done', '완료', 'Checkbox', '체크박스', 'Status Check'];
     let updated = false;
 
     for (const name of propertyNames) {

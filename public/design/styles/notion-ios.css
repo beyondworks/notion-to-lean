@@ -148,7 +148,7 @@
 }
 
 /* ── Base ─────────────────────────────────────────────── */
-* { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; font-family: var(--f-ui); color: var(--n-text); background: var(--n-bg-grouped); }
 
 /* Text utility classes */
@@ -279,10 +279,10 @@ html, body { margin: 0; font-family: var(--f-ui); color: var(--n-text); backgrou
 
 /* Chevron (iOS disclosure) */
 .chev {
-  width: 7px; height: 12px; flex-shrink: 0;
-  border-right: 1.8px solid var(--n-text-faint);
-  border-bottom: 1.8px solid var(--n-text-faint);
-  transform: rotate(-45deg);
+  width: 8px; height: 14px; flex-shrink: 0;
+  background: var(--n-text-faint);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'><path d='M1 1 L7 7 L1 13' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") center/contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 14'><path d='M1 1 L7 7 L1 13' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>") center/contain no-repeat;
 }
 
 /* FAB */
@@ -348,3 +348,90 @@ html, body { margin: 0; font-family: var(--f-ui); color: var(--n-text); backgrou
 
 /* Pretty numbers */
 .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+
+/* Tap feedback — subtle row press */
+.g-row { transition: background var(--d-fast) var(--e-out); user-select: none; -webkit-user-select: none; }
+.g-row[onclick], .g-row--tap { cursor: pointer; }
+.g-row--tap:active { background: var(--n-surface-hover); }
+.g-row[onclick]:active { background: var(--n-surface-hover); }
+
+/* Prevent text selection on interactive elements */
+.btn, .tab-item, .pill, .nav-icon-btn, .icon-tile { user-select: none; -webkit-user-select: none; }
+
+
+/* Prevent long URLs/content from overflowing cards */
+.t-body, .t-headline, .t-footnote, .t-callout, .t-subhead { overflow-wrap: anywhere; word-break: break-word; }
+
+
+/* ── Font size scale (set via data-font-size on html) ── */
+html[data-font-size="작게"] {
+  --fs-large-title: 28px; --lh-large-title: 34px;
+  --fs-title-1: 24px;     --lh-title-1: 30px;
+  --fs-title-2: 19px;     --lh-title-2: 25px;
+  --fs-title-3: 17px;     --lh-title-3: 22px;
+  --fs-headline: 15px;    --lh-headline: 20px;
+  --fs-body: 15px;        --lh-body: 20px;
+  --fs-callout: 14px;     --lh-callout: 19px;
+  --fs-subhead: 13px;     --lh-subhead: 18px;
+  --fs-footnote: 12px;    --lh-footnote: 16px;
+  --fs-caption: 11px;     --lh-caption: 14px;
+}
+html[data-font-size="크게"] {
+  --fs-large-title: 38px; --lh-large-title: 45px;
+  --fs-title-1: 32px;     --lh-title-1: 38px;
+  --fs-title-2: 25px;     --lh-title-2: 31px;
+  --fs-title-3: 23px;     --lh-title-3: 28px;
+  --fs-headline: 19px;    --lh-headline: 24px;
+  --fs-body: 19px;        --lh-body: 25px;
+  --fs-callout: 18px;     --lh-callout: 23px;
+  --fs-subhead: 17px;     --lh-subhead: 22px;
+  --fs-footnote: 15px;    --lh-footnote: 20px;
+  --fs-caption: 13px;     --lh-caption: 17px;
+}
+html[data-font-size="아주 크게"] {
+  --fs-large-title: 42px; --lh-large-title: 50px;
+  --fs-title-1: 36px;     --lh-title-1: 44px;
+  --fs-title-2: 28px;     --lh-title-2: 34px;
+  --fs-title-3: 26px;     --lh-title-3: 32px;
+  --fs-headline: 22px;    --lh-headline: 28px;
+  --fs-body: 22px;        --lh-body: 28px;
+  --fs-callout: 21px;     --lh-callout: 27px;
+  --fs-subhead: 20px;     --lh-subhead: 26px;
+  --fs-footnote: 17px;    --lh-footnote: 22px;
+  --fs-caption: 15px;     --lh-caption: 19px;
+}
+
+
+/* ── Wiggle mode (iOS-style home edit) ── */
+@keyframes wiggle {
+  0% { transform: rotate(-0.6deg) translateY(0); }
+  50% { transform: rotate(0.6deg) translateY(-1px); }
+  100% { transform: rotate(-0.6deg) translateY(0); }
+}
+.widget-wiggle {
+  animation: wiggle 0.6s ease-in-out infinite;
+  animation-delay: calc(var(--wiggle-delay, 0ms));
+  transform-origin: center;
+}
+
+
+/* Widget shelf: allow vertical overflow for × badges */
+.widget-shelf {
+  overflow-x: auto;
+  overflow-y: visible !important;
+  padding-top: 10px;
+}
+
+
+/* Subtle bottom padding on page content so last row doesn't sit right under the dock */
+.page-content { padding-bottom: calc(110px + var(--safe-b)); }
+
+
+
+
+/* Content fade under tab bar — uses mask, not color overlay */
+.scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 110px), transparent 100%);
+          mask-image: linear-gradient(to bottom, black calc(100% - 110px), transparent 100%);
+}

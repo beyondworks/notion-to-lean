@@ -96,6 +96,28 @@ export async function searchNotion(query: string): Promise<any[]> {
   return response.results;
 }
 
+/**
+ * List all databases the integration has access to.
+ */
+export async function listDatabases(): Promise<any[]> {
+  if (!apiKey) return [];
+  const res = await fetch('https://api.notion.com/v1/search', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      filter: { property: 'object', value: 'database' },
+      page_size: 100,
+    }),
+  });
+  if (!res.ok) throw new Error(`Notion list databases failed: ${res.status}`);
+  const data = await res.json();
+  return data.results ?? [];
+}
+
 // ---------------------------------------------------------------------------
 // Property extraction helpers
 // ---------------------------------------------------------------------------

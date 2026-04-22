@@ -66,18 +66,33 @@ export async function GET(request: NextRequest) {
 
   try {
     const pages = await searchNotion(q);
+    const qLower = q.toLowerCase();
+
+    // Extract a title from any page by scanning all title-type properties
+    function extractTitle(page: any): string {
+      // First try known names
+      const known = getPropertyValueMulti(
+        page,
+        ['Entry name', 'Entry', 'Name', '이름', 'Title', '제목'],
+        'title',
+      );
+      if (known) return known;
+      // Fallback: iterate all properties and pick the first with type=title
+      for (const def of Object.values(page.properties ?? {})) {
+        const d = def as any;
+        if (d?.type === 'title' && Array.isArray(d.title)) {
+          return d.title.map((t: any) => t.plain_text || '').join('').trim();
+        }
+      }
+      return '';
+    }
+
     const results: SearchResult[] = pages
       .filter((p: any) => p.object === 'page')
       .map((page: any) => {
-        const title = getPropertyValueMulti(
-          page,
-          ['Name', '이름', 'Title', '제목'],
-          'title',
-        );
-
+        const title = extractTitle(page);
         const parentDbId = page.parent?.database_id ?? '';
         const mapping = DB_ICON_MAP[parentDbId] ?? { type: 'work' as const, icon: 'FileText' };
-
         return {
           id: page.id,
           title: title || '(제목 없음)',
@@ -85,7 +100,9 @@ export async function GET(request: NextRequest) {
           icon: mapping.icon,
           url: pageUrl(page.id),
         };
-      });
+      })
+      // Only keep items whose title actually contains the query (case-insensitive)
+      .filter((r) => r.title && r.title !== '(제목 없음)' && r.title.toLowerCase().includes(qLower));
 
     return NextResponse.json({ results, mock: false });
   } catch (err) {

@@ -1,4 +1,31 @@
 /* Shared UI primitives for Notion × iOS26 prototype */
+
+/* ── Minimal i18n ─────────────────── */
+const I18N = {
+  "한국어": {
+    "홈": "홈", "검색": "검색", "새로": "새로", "인박스": "인박스", "나": "나",
+    "안녕하세요": "안녕하세요",
+    "데이터베이스": "데이터베이스", "오늘": "오늘", "최근": "최근",
+    "무엇이든 검색, 명령 실행": "무엇이든 검색, 명령 실행",
+    "설정": "설정", "프로필": "프로필", "인박스": "인박스", "캘린더": "캘린더",
+    "새로고침": "새로고침", "다크 모드": "다크 모드",
+  },
+  "English": {
+    "홈": "Home", "검색": "Search", "새로": "New", "인박스": "Inbox", "나": "Me",
+    "안녕하세요": "Hi",
+    "데이터베이스": "Databases", "오늘": "Today", "최근": "Recent",
+    "무엇이든 검색, 명령 실행": "Search anything, run commands",
+    "설정": "Settings", "프로필": "Profile", "캘린더": "Calendar",
+    "새로고침": "Refresh", "다크 모드": "Dark Mode",
+  },
+};
+function t(k) {
+  if (typeof window === "undefined") return k;
+  const lang = localStorage.getItem("nm-lang") || "한국어";
+  return (I18N[lang] && I18N[lang][k]) || k;
+}
+window.t = t;
+
 const { useState, useEffect, useRef, useMemo } = React;
 
 /* ── Icons (SF Symbol style, stroke 1.8) ─────────────── */
@@ -35,6 +62,10 @@ function Icon({ name, size = 22, color = "currentColor", strokeWidth = 1.8 }) {
     case "settings":return <svg style={s} viewBox="0 0 22 22"><circle {...p} cx="11" cy="11" r="3"/><path {...p} d="M11 2 V4 M11 18 V20 M20 11 H18 M4 11 H2 M17.4 4.6 L16 6 M6 16 L4.6 17.4 M17.4 17.4 L16 16 M6 6 L4.6 4.6"/></svg>;
     case "lock":    return <svg style={s} viewBox="0 0 22 22"><rect {...p} x="4" y="10" width="14" height="9" rx="2"/><path {...p} d="M7 10 V7 a4 4 0 0 1 8 0 V10"/></svg>;
     case "sync":    return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M4 11 a7 7 0 0 1 12 -5 L18 4 V8 H14 M18 11 a7 7 0 0 1 -12 5 L4 18 V14 H8"/></svg>;
+    case "moon":    return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M18.5 14.5 A8 8 0 0 1 7.5 3.5 a8 8 0 1 0 11 11 Z"/></svg>;
+    case "sun":     return <svg style={s} viewBox="0 0 22 22"><circle {...p} cx="11" cy="11" r="4"/><path {...p} d="M11 2 V4 M11 18 V20 M20 11 H18 M4 11 H2 M17.4 4.6 L16 6 M6 16 L4.6 17.4 M17.4 17.4 L16 16 M6 6 L4.6 4.6"/></svg>;
+    case "pencil":  return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M3 19 L5 13 L15 3 L19 7 L9 17 Z M13 5 L17 9 M3 19 H9"/></svg>;
+    case "ellipsis": return <svg style={s} viewBox="0 0 22 22"><circle cx="5" cy="11" r="1.6" fill={color}/><circle cx="11" cy="11" r="1.6" fill={color}/><circle cx="17" cy="11" r="1.6" fill={color}/></svg>;
     default: return null;
   }
 }
@@ -117,7 +148,7 @@ function NavBar({ title, large = true, left, right, subtitle, onScrollCollapse =
     }}>
       <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", minHeight: 44}}>
         <div style={{display: "flex", alignItems: "center", gap: 4}}>{left}</div>
-        {!large && <div className="t-headline" style={{position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none"}}>{title}</div>}
+        {!large && <div className="t-headline" style={{position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none"}}><span style={{pointerEvents: "auto"}}>{title}</span></div>}
         <div style={{display: "flex", alignItems: "center", gap: 4}}>{right}</div>
       </div>
       {large && (
@@ -150,11 +181,11 @@ function NavIconBtn({ icon, onClick, badge }) {
 /* ── Liquid-glass bottom tab bar ─────────────────────── */
 function TabBar({ active = 0, onChange }) {
   const items = [
-    { icon: "home", label: "홈" },
-    { icon: "search", label: "검색" },
-    { icon: "plus", label: "새로" },
-    { icon: "inbox", label: "인박스" },
-    { icon: "person", label: "나" },
+    { icon: "home", label: t("홈") },
+    { icon: "search", label: t("검색") },
+    { icon: "plus", label: t("새로") },
+    { icon: "inbox", label: t("인박스") },
+    { icon: "person", label: t("나") },
   ];
   return (
     <div className="tabbar glass">

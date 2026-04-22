@@ -152,8 +152,11 @@ const INSIGHTS_SUB_DB = {
 };
 
 function DbListScreen({ go, goBack, ctx }) {
-  const dbKey = ctx?.dbKey || "tasks";
-  const cfg = DB_CONFIG[dbKey] || DB_CONFIG.tasks;
+  const dbKey = ctx?.dbKey;
+  const hasCustomDb = !!ctx?.dbId && !dbKey;
+  const cfg = hasCustomDb
+    ? { endpoint: `insights?dbId=${ctx.dbId}`, title: ctx.subTitle || "데이터베이스" }
+    : (DB_CONFIG[dbKey || "tasks"] || DB_CONFIG.tasks);
   const isTasks = dbKey === "tasks";
 
   const [view, setView] = uS2("list");
@@ -206,25 +209,28 @@ function DbListScreen({ go, goBack, ctx }) {
   const subDbId = ctx?.dbId || null;
   const subTitle = ctx?.subTitle || null;
 
-  React.useEffect(() => {
-    setLoading(true);
-    const url = subDbId
-      ? `/api/${cfg.endpoint}?dbId=${subDbId}`
-      : `/api/${cfg.endpoint}`;
+  const fetchDbData = React.useCallback((showLoader = true) => {
+    if (showLoader) setLoading(true);
+    let url = `/api/${cfg.endpoint}`;
+    if (subDbId && !cfg.endpoint.includes("?")) url = `/api/${cfg.endpoint}?dbId=${subDbId}`;
     fetch(url)
       .then(r => r.ok ? r.json() : { data: [] })
       .then(j => {
         const raw = j.data || [];
-        if (isTasks) {
-          const arr = raw.map(mapNotionTaskToCard);
-          setTasks(arr);
-        } else {
-          setItems(raw);
-        }
+        if (isTasks) setTasks(raw.map(mapNotionTaskToCard));
+        else setItems(raw);
         setLoading(false);
       })
-      .catch(() => { setLoading(false); });
-  }, [dbKey, subDbId]);
+      .catch(() => setLoading(false));
+  }, [cfg.endpoint, subDbId, isTasks]);
+  React.useEffect(() => {
+    fetchDbData(true);
+    const interval = setInterval(() => fetchDbData(false), 20000);
+    const onVis = () => { if (!document.hidden) fetchDbData(false); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", () => fetchDbData(false));
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVis); };
+  }, [fetchDbData]);
 
   const bucket = (which) => {
     if (which === "today") return tasks.filter(t => t.due === "오늘" || t.due === "어제");
@@ -240,10 +246,78 @@ function DbListScreen({ go, goBack, ctx }) {
       ? `${openCount} open · ${tasks.length} total`
       : `${items.length}개`;
 
-  const displayTitle = subDbId && subTitle ? `${cfg.title} · ${subTitle}` : cfg.title;
+  // Alias support — user can rename DB display title; stored per dbId/dbKey
+  const aliasKey = hasCustomDb ? `nm-db-alias-${ctx?.dbId}` : (ctx?.widgetKey ? `nm-db-alias-w-${ctx.widgetKey}` : (dbKey ? `nm-db-alias-${dbKey}` : null));
+  const baseTitle = (hasCustomDb) ? cfg.title : (subDbId && subTitle ? `${cfg.title} · ${subTitle}` : cfg.title);
+  const [titleAlias, setTitleAlias] = uS2(() => aliasKey ? (localStorage.getItem(aliasKey) || "") : "");
+  const effectiveTitle = titleAlias || baseTitle;
+  const editableTitle = (
+    <span
+      contentEditable
+      suppressContentEditableWarning
+      onBlur={(e) => {
+        const v = e.currentTarget.innerText.trim();
+        if (!aliasKey) return;
+        const newName = (!v || v === baseTitle) ? "" : v;
+        if (newName) {
+          localStorage.setItem(aliasKey, newName);
+          setTitleAlias(newName);
+        } else {
+          localStorage.removeItem(aliasKey);
+          setTitleAlias("");
+        }
+        // Propagate the new name to any home widgets referencing this dbKey/dbId
+        try {
+          const CORE_NAMES = { tasks:"태스크", calendar:"캘린더", works:"웍스", insights:"인사이트", finance:"가계부", reflection:"스크립트" };
+          const CORE_WIDGETS_FALLBACK = [
+            { key: "tasks", dbKey: "tasks", n: "태스크", c: "#DDEDEA", fg: "#448361", icon: "✓", go: "db-list", core: true },
+            { key: "calendar", dbKey: "tasks", n: "캘린더", c: "#DDEBF1", fg: "#337EA9", icon: "📅", go: "calendar", core: true },
+            { key: "works", dbKey: "works", n: "웍스", c: "#EAE4F2", fg: "#9065B0", icon: "◆", go: "db-list", core: true },
+            { key: "insights", dbKey: "insights", n: "인사이트", c: "#FBF3DB", fg: "#CB912F", icon: "✎", go: "db-list", core: true },
+            { key: "finance", dbKey: "finance", n: "가계부", c: "#FDEBEC", fg: "#D44C47", icon: "₩", go: "db-list", core: true },
+            { key: "reflection", dbKey: "reflection", n: "스크립트", c: "#F4EEEE", fg: "#9F6B53", icon: "✐", go: "db-list", core: true },
+          ];
+          const sectionsRaw = localStorage.getItem("nm-sections");
+          const sections = sectionsRaw ? JSON.parse(sectionsRaw) : [{id:"default", name:"데이터베이스"},{id:"widgets", name:"위젯"}];
+          sections.forEach(sec => {
+            const key = `nm-section-${sec.id}-widgets`;
+            let list;
+            try { list = JSON.parse(localStorage.getItem(key) || "null"); } catch { list = null; }
+            if (!Array.isArray(list)) {
+              // First-time: use default CORE for "default" section, empty otherwise
+              list = sec.id === "default" ? CORE_WIDGETS_FALLBACK : [];
+            }
+            let changed = false;
+            const next = list.map(w => {
+              const matches =
+                (ctx?.dbId && w.dbId === ctx.dbId) ||
+                (ctx?.widgetKey && w.key === ctx.widgetKey) ||
+                (!ctx?.dbId && !ctx?.widgetKey && dbKey && w.dbKey === dbKey && w.key === dbKey);
+              if (matches) {
+                changed = true;
+                const resetName = !newName
+                  ? (CORE_NAMES[w.key] || w.n)
+                  : newName;
+                return { ...w, n: resetName };
+              }
+              return w;
+            });
+            if (changed) {
+              localStorage.setItem(key, JSON.stringify(next));
+              window.dispatchEvent(new CustomEvent("nm-section-update", {detail: {sectionId: sec.id}}));
+            }
+          });
+        } catch {}
+      }}
+      style={{outline: "none", cursor: "text", padding: "0 2px", borderRadius: 4}}
+    >{effectiveTitle}</span>
+  );
   const handleBack = () => {
+    if (hasCustomDb) {
+      goBack ? goBack() : go("home");
+      return;
+    }
     if (subDbId) {
-      // From sub-DB → back to parent category listing
       go("db-list", {dbKey});
     } else {
       go("home");
@@ -252,12 +326,12 @@ function DbListScreen({ go, goBack, ctx }) {
 
   return (
     <>
-      <NavBar title={displayTitle} subtitle={subtitle}
+      <NavBar title={editableTitle} subtitle={subtitle}
         left={<NavIconBtn icon="back" onClick={handleBack}/>}
         right={<><NavIconBtn icon="filter"/><NavIconBtn icon="more"/></>}
       />
       {isTasks && <ViewSwitcher view={view} setView={setView}/>}
-      <div style={{flex: 1, overflowY: "auto", padding: "2px 16px 0"}}>
+      <div style={{flex: 1, overflowY: "auto", padding: "2px 16px 0"}} className="scroll-fade">
         {!isTasks && dbKey !== "finance" && (
           <div style={{paddingTop: 12}}>
             {/* Search filter (기본) */}
@@ -458,14 +532,16 @@ function DbListScreen({ go, goBack, ctx }) {
         <Icon name="plus" size={24} color="var(--n-bg)"/>
       </button>
 
-      <TabBar active={0} onChange={i => i === 0 && go("home")}/>
+      <TabBar active={0} onChange={i => { if (i === 0) go("home"); else if (i === 1) go("search"); else if (i === 2) go("event-edit"); else if (i === 3) go("inbox"); else if (i === 4) go("settings"); }}/>
     </>
   );
 }
 
 /* ─── Calendar: Month grid + Agenda list (tap date = expand) ─── */
-function CalendarScreen({ go, goBack }) {
+function CalendarScreen({ go, goBack, ctx }) {
   const today = new Date();
+  const calAliasKey = "nm-db-alias-w-calendar";
+  const [calAlias, setCalAlias] = uS2(() => (typeof localStorage !== "undefined" && localStorage.getItem(calAliasKey)) || "캘린더");
   const [viewYear, setViewYear] = uS2(today.getFullYear());
   const [viewMonth, setViewMonth] = uS2(today.getMonth());
   const [sel, setSel] = uS2(today.getDate());
@@ -491,7 +567,7 @@ function CalendarScreen({ go, goBack }) {
     return `${h}:${m}`;
   }
 
-  React.useEffect(() => {
+  const fetchEvents = React.useCallback(() => {
     fetch("/api/tasks")
       .then(r => r.ok ? r.json() : { data: [] })
       .then(j => {
@@ -516,6 +592,14 @@ function CalendarScreen({ go, goBack }) {
       })
       .catch(() => setLoading(false));
   }, [viewYear, viewMonth]);
+  React.useEffect(() => {
+    fetchEvents();
+    const interval = setInterval(fetchEvents, 20000);
+    const onVis = () => { if (!document.hidden) fetchEvents(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", fetchEvents);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", fetchEvents); };
+  }, [fetchEvents]);
 
   const toggleDone = async (eventId, currentDone) => {
     // Optimistic update
@@ -549,11 +633,55 @@ function CalendarScreen({ go, goBack }) {
 
   return (
     <>
-      <NavBar title={`${viewMonth + 1}월 ${viewYear}`} large={false}
+      <NavBar title={<span style={{display: "inline-flex", alignItems: "center", gap: 8}}>
+          <span
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              const v = e.currentTarget.innerText.trim();
+              const newName = (!v || v === "캘린더") ? "" : v;
+              if (newName) localStorage.setItem(calAliasKey, newName);
+              else localStorage.removeItem(calAliasKey);
+              setCalAlias(newName || "캘린더");
+              // propagate to calendar widget on home
+              try {
+                const sectionsRaw = localStorage.getItem("nm-sections");
+                const sections = sectionsRaw ? JSON.parse(sectionsRaw) : [{id:"default"},{id:"widgets"}];
+                sections.forEach(sec => {
+                  const key = `nm-section-${sec.id}-widgets`;
+                  let list;
+                  try { list = JSON.parse(localStorage.getItem(key) || "null"); } catch { list = null; }
+                  if (!Array.isArray(list)) {
+                    if (sec.id !== "default") return;
+                    list = [
+                      { key: "tasks", dbKey: "tasks", n: "태스크", c: "#DDEDEA", fg: "#448361", icon: "✓", go: "db-list", core: true },
+                      { key: "calendar", dbKey: "tasks", n: "캘린더", c: "#DDEBF1", fg: "#337EA9", icon: "📅", go: "calendar", core: true },
+                      { key: "works", dbKey: "works", n: "웍스", c: "#EAE4F2", fg: "#9065B0", icon: "◆", go: "db-list", core: true },
+                      { key: "insights", dbKey: "insights", n: "인사이트", c: "#FBF3DB", fg: "#CB912F", icon: "✎", go: "db-list", core: true },
+                      { key: "finance", dbKey: "finance", n: "가계부", c: "#FDEBEC", fg: "#D44C47", icon: "₩", go: "db-list", core: true },
+                      { key: "reflection", dbKey: "reflection", n: "스크립트", c: "#F4EEEE", fg: "#9F6B53", icon: "✐", go: "db-list", core: true },
+                    ];
+                  }
+                  let changed = false;
+                  const next = list.map(w => {
+                    if (w.key === "calendar") { changed = true; return {...w, n: newName || "캘린더"}; }
+                    return w;
+                  });
+                  if (changed) {
+                    localStorage.setItem(key, JSON.stringify(next));
+                    window.dispatchEvent(new CustomEvent("nm-section-update", {detail: {sectionId: sec.id}}));
+                  }
+                });
+              } catch {}
+            }}
+            style={{outline: "none", cursor: "text", padding: "0 2px"}}
+          >{calAlias}</span>
+          <span style={{color: "var(--n-text-muted)", fontWeight: 500}}>{viewMonth + 1}월 {viewYear}</span>
+        </span>} large={false}
         left={<NavIconBtn icon="back" onClick={goBack}/>}
         right={<><NavIconBtn icon="search" onClick={() => go("search")}/><NavIconBtn icon="plus" onClick={() => go("event-edit")}/></>}
       />
-      <div style={{flex: 1, overflowY: "auto"}}>
+      <div style={{flex: 1, overflowY: "auto"}} className="scroll-fade">
         {/* Weekday header */}
         <div style={{display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "4px 10px 6px"}}>
           {["일","월","화","수","목","금","토"].map((d, i) => (
@@ -570,32 +698,34 @@ function CalendarScreen({ go, goBack }) {
             const isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
             return (
               <div key={i} onClick={() => d && setSel(d)} style={{
-                aspectRatio: "1/1", padding: 4, cursor: d ? "pointer" : "default",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                height: 58, padding: "4px 2px 2px", cursor: d ? "pointer" : "default",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
                 userSelect: "none", gap: 4, position: "relative",
               }}>
                 <div style={{
-                  width: 34, height: 34, borderRadius: 17,
+                  width: 32, height: 32, borderRadius: 16,
                   display: "grid", placeItems: "center",
                   background: isSel ? "var(--n-accent)" : isToday ? "var(--n-surface-hover)" : "transparent",
                   color: isSel ? "var(--n-bg)" : isSun ? "#D44C47" : "var(--n-text)",
                   fontWeight: isToday || isSel ? 700 : 500,
                   fontSize: 15,
                 }} className="num">{d || ""}</div>
-                {count > 0 && (
-                  <div style={{
-                    minWidth: 16, height: 16,
-                    padding: "0 5px",
-                    borderRadius: 8,
-                    background: isSel ? "var(--n-bg)" : "var(--n-accent)",
-                    color: isSel ? "var(--n-accent)" : "var(--n-bg)",
-                    fontSize: 10,
-                    fontWeight: 600,
-                    display: "grid",
-                    placeItems: "center",
-                    lineHeight: 1,
-                  }}>{count}</div>
-                )}
+                <div style={{ height: 16, display: "flex", alignItems: "center" }}>
+                  {count > 0 && (
+                    <div style={{
+                      minWidth: 16, height: 16,
+                      padding: "0 5px",
+                      borderRadius: 8,
+                      background: isSel ? "var(--n-bg)" : "var(--n-tag-blue-bg)",
+                      color: isSel ? "var(--n-accent)" : "var(--n-tag-blue-fg)",
+                      fontSize: 10,
+                      fontWeight: 600,
+                      display: "grid",
+                      placeItems: "center",
+                      lineHeight: 1,
+                    }}>{count}</div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -641,10 +771,7 @@ function CalendarScreen({ go, goBack }) {
 
         <TabSpacer/>
       </div>
-      <button className="fab" style={{right: 20, bottom: 96}} onClick={() => go("event-edit")}>
-        <Icon name="plus" size={24} color="var(--n-bg)"/>
-      </button>
-      <TabBar active={0} onChange={i => i === 0 && go("home")}/>
+      <TabBar active={0} onChange={i => { if (i === 0) go("home"); else if (i === 1) go("search"); else if (i === 2) go("event-edit"); else if (i === 3) go("inbox"); else if (i === 4) go("settings"); }}/>
     </>
   );
 }
