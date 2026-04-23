@@ -8,7 +8,7 @@ export default function GlobalLoading() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '100vh',
+        minHeight: 'var(--app-vh)',
         background: 'var(--n-canvas)',
         gap: '10px',
       }}

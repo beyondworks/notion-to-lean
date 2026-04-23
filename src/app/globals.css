@@ -97,6 +97,11 @@
   /* Safe areas */
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --kb-b: 0px;
+  --app-vh: 100dvh;
+  --tabbar-h: 62px;
+  --tabbar-gap: 12px;
+  --tabbar-space: calc(var(--tabbar-h) + var(--tabbar-gap) + var(--safe-b) + 20px);
 
   /* Legacy aliases (for gradual migration of older pages) */
   --bg: var(--n-bg-grouped);
@@ -170,13 +175,13 @@
 }
 
 * { box-sizing: border-box; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; padding: 0; height: 100%; }
+html, body { margin: 0; padding: 0; min-height: 100dvh; }
 body {
   font-family: var(--f-ui);
   color: var(--n-text);
   background: radial-gradient(1200px 700px at 50% 0%, #F1EEE7 0%, #E8E3D8 55%, #DDD6C7 100%);
   background-attachment: fixed;
-  min-height: 100vh;
+  min-height: var(--app-vh);
 }
 [data-theme="dark"] body {
   background: radial-gradient(1200px 700px at 50% 0%, #262626 0%, #181818 55%, #0E0E0E 100%);
@@ -329,8 +334,8 @@ body {
 .tabbar {
   position: fixed;
   left: 12px; right: 12px;
-  bottom: calc(12px + var(--safe-b));
-  height: 62px;
+  bottom: calc(var(--tabbar-gap) + var(--safe-b) + var(--kb-b));
+  height: var(--tabbar-h);
   border-radius: 22px;
   display: grid; grid-template-columns: repeat(5, 1fr);
   align-items: center;
@@ -384,7 +389,7 @@ body {
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 
 /* ────────── Page content padding (for tab bar) ────────── */
-.page-content { padding-bottom: calc(100px + var(--safe-b)); }
+.page-content { padding-bottom: calc(var(--tabbar-space) + var(--kb-b)); }
 
 /* ────────── NavBar (iOS large title) ────────── */
 .navbar {
@@ -429,15 +434,15 @@ body {
 }
 .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
 .sheet {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 61;
+  position: fixed; bottom: var(--kb-b); left: 0; right: 0; z-index: 61;
   background: var(--n-bg-grouped);
   border-radius: var(--r-2xl) var(--r-2xl) 0 0;
-  max-height: 88%;
+  max-height: calc(88dvh - var(--safe-t) - var(--kb-b));
   display: flex; flex-direction: column;
   box-shadow: 0 -20px 40px rgba(0,0,0,0.15);
   transform: translateY(100%);
   transition: transform var(--d-base) var(--e-out);
-  padding-bottom: var(--safe-b);
+  padding-bottom: calc(var(--safe-b) + 8px);
 }
 .sheet.open { transform: translateY(0); }
 .sheet-grabber {

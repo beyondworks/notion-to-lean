@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { ViewportMetrics } from "@/components/ViewportMetrics";
 import "./globals.css";
 
 const inter = Inter({
@@ -9,13 +10,21 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Beyondworks",
-  description: "Notion 워크스페이스를 모바일 위젯 대시보드로",
+  title: "Nolio",
+  description: "Notion 워크스페이스를 모바일 친화적인 플로우 UI로",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Beyondworks",
+    title: "Nolio",
   },
 };
 
@@ -34,7 +43,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={inter.variable}>
-      <body>{children}</body>
+      <body>
+        <ViewportMetrics />
+        {children}
+      </body>
     </html>
   );
 }

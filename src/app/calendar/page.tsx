@@ -91,7 +91,7 @@ export default function CalendarPage() {
     d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
 
   return (
-    <div className="page-content" style={{ minHeight: '100vh', background: 'var(--n-bg-grouped)' }}>
+    <div className="page-content" style={{ minHeight: 'var(--app-vh)', background: 'var(--n-bg-grouped)' }}>
       <NavBar
         title={`${viewYear}년 ${MONTH_NAMES_KO[viewMonth]}`}
         large={false}

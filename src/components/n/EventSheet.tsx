@@ -72,7 +72,7 @@ export default function EventSheet({ open, onClose, onCreated }: EventSheetProps
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 16 }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 'calc(24px + var(--safe-b))' }}>
           {/* Quick capture */}
           <div style={{ padding: '8px 20px 16px' }}>
             <div style={{

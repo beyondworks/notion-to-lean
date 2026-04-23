@@ -170,7 +170,7 @@ export default function EditPage() {
   const isLoading = pageLoading || blocksLoading;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: 40 }}>
+    <div style={{ minHeight: 'var(--app-vh)', background: 'var(--bg)', paddingBottom: 40 }}>
       {/* Header */}
       <div className="edit-header">
         <button

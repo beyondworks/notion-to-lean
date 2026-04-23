@@ -114,7 +114,7 @@ export default function HomePage() {
   const subtitle = `${DAY_NAMES_EN[today.getDay()]} · ${MONTH_NAMES_EN[today.getMonth()]} ${today.getDate()}`;
 
   return (
-    <div className="page-content" style={{ minHeight: '100vh' }}>
+    <div className="page-content" style={{ minHeight: 'var(--app-vh)' }}>
       <NavBar
         title="안녕하세요, 현우"
         subtitle={subtitle}

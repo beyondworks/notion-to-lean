@@ -25,7 +25,7 @@ const SETTINGS = [
 
 export default function FinancePage() {
   return (
-    <div className="page-content" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <div className="page-content" style={{ minHeight: 'var(--app-vh)', background: 'var(--bg)' }}>
       {/* Top bar */}
       <header className="top-bar">
         <div className="top-bar-left">

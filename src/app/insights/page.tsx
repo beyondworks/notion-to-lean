@@ -23,7 +23,7 @@ export default function InsightsPage() {
       : (insights ?? []).filter((c) => c.category === activeFilter);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--n-canvas)' }}>
+    <div style={{ minHeight: 'var(--app-vh)', background: 'var(--n-canvas)' }}>
       {/* Header */}
       <div
         style={{

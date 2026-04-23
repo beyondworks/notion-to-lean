@@ -131,7 +131,7 @@ export default function DbPage() {
   };
 
   return (
-    <div className="page-content" style={{ minHeight: '100vh' }}>
+    <div className="page-content" style={{ minHeight: 'var(--app-vh)' }}>
       <NavBar
         title={TITLES[key] || key}
         subtitle={subtitle}
@@ -292,7 +292,7 @@ export default function DbPage() {
 
       <button
         className="fab"
-        style={{ right: 20, bottom: 96 }}
+        style={{ right: 20, bottom: 'calc(var(--tabbar-space) + 4px + var(--kb-b))' }}
         onClick={() => router.push('/edit/new')}
         aria-label="새로 만들기"
       >

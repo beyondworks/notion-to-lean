@@ -16,7 +16,7 @@ export default function GlobalError({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '100vh',
+        minHeight: 'var(--app-vh)',
         padding: '24px',
         background: 'var(--n-canvas)',
         gap: '12px',
