@@ -925,7 +925,41 @@ function CalendarScreen({ go, goBack, ctx }) {
     return `${h}:${m}`;
   }
 
+  // If ctx.dbId is set, this calendar reads events from that arbitrary DB
+  // (any date-property row becomes an event). Otherwise fall back to the
+  // mapped Tasks DB.
+  const customDbId = ctx?.dbId || null;
   const fetchEvents = React.useCallback(() => {
+    if (customDbId) {
+      const url = `/api/database-pages?dbId=${encodeURIComponent(customDbId)}`;
+      window.nmFetch(url)
+        .then(j => j || { data: [] })
+        .then(j => {
+          const arr = j.data || [];
+          const map = {};
+          arr.forEach(page => {
+            const dateProp = (page.properties || []).find(p => p.type === "date" && p.text);
+            if (!dateProp) return;
+            const iso = dateProp.value?.start || dateProp.text;
+            if (!iso) return;
+            const d = new Date(iso);
+            if (d.getFullYear() !== viewYear || d.getMonth() !== viewMonth) return;
+            const day = d.getDate();
+            if (!map[day]) map[day] = [];
+            map[day].push({
+              id: page.id,
+              t: page.title,
+              c: catToColor(page.category),
+              time: fmtTimeRange(iso),
+              done: false,
+            });
+          });
+          setEvents(map);
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+      return;
+    }
     const taskUrl = window.nmCoreEndpoint?.("calendar") || window.nmCoreEndpoint?.("tasks") || "/api/tasks";
     window.nmFetch(taskUrl)
       .then(j => j || { data: [] })
@@ -950,7 +984,7 @@ function CalendarScreen({ go, goBack, ctx }) {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [viewYear, viewMonth]);
+  }, [viewYear, viewMonth, customDbId]);
   React.useEffect(() => {
     fetchEvents();
     const interval = setInterval(fetchEvents, 20000);

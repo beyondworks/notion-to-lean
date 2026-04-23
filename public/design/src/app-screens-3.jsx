@@ -993,16 +993,18 @@ function EventEditScreen({ go, goBack, ctx }) {
         position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 20,
       }} onClick={() => goBack ? goBack() : go("home")}/>
 
-      {/* Sheet */}
+      {/* Sheet — Phone height already excludes the keyboard via --nm-app-height,
+           so anchor at bottom:0 (don't add keyboard offset again) and cap the
+           sheet height using the same app-height so it never reaches the notch. */}
       <div style={{
         position: "absolute",
         left: 0,
         right: 0,
-        bottom: "var(--nm-keyboard-bottom, 0px)",
+        bottom: 0,
         zIndex: 21,
         background: "var(--n-bg-grouped)",
         borderTopLeftRadius: 26, borderTopRightRadius: 26,
-        maxHeight: "calc(88dvh - var(--safe-t, 0px) - var(--nm-keyboard-bottom, 0px))",
+        maxHeight: "calc(var(--nm-app-height, 100dvh) - var(--safe-t, 0px) - 24px)",
         display: "flex", flexDirection: "column",
         boxShadow: "0 -20px 40px rgba(0,0,0,0.15)",
         paddingBottom: "calc(var(--safe-b, env(safe-area-inset-bottom, 0px)) + 8px)",

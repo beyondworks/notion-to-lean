@@ -533,9 +533,21 @@ function NavBar({ title, large = true, left, right, subtitle, onScrollCollapse =
       paddingTop: "var(--nm-nav-top, 54px)",
       background: onScrollCollapse ? "transparent" : "var(--n-bg-grouped)",
     }}>
-      <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", minHeight: 44}}>
+      {/* position: relative so absolutely-positioned compact title is scoped to
+          this row (not the Phone container — that would place it under the notch). */}
+      <div style={{position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", minHeight: 44}}>
         <div style={{display: "flex", alignItems: "center", gap: 4}}>{left}</div>
-        {!large && <div className="t-headline" style={{position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none"}}><span style={{pointerEvents: "auto"}}>{title}</span></div>}
+        {!large && (
+          <div
+            className="t-headline"
+            style={{
+              position: "absolute",
+              left: 0, right: 0, top: 0, bottom: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              textAlign: "center", pointerEvents: "none",
+            }}
+          ><span style={{pointerEvents: "auto"}}>{title}</span></div>
+        )}
         <div style={{display: "flex", alignItems: "center", gap: 4}}>{right}</div>
       </div>
       {large && (

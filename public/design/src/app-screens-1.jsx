@@ -1275,11 +1275,11 @@ function AddWidgetSheet({ onClose, onAdd, go }) {
           position: "absolute",
           left: 0,
           right: 0,
-          bottom: "var(--nm-keyboard-bottom, 0px)",
+          bottom: 0,
           background: "var(--n-bg-grouped)",
           borderRadius: "22px 22px 0 0",
           padding: "10px 16px 0",
-          maxHeight: "calc(78dvh - var(--nm-keyboard-bottom, 0px))",
+          maxHeight: "calc(var(--nm-app-height, 100dvh) - var(--safe-t, 0px) - 24px)",
           display: "flex", flexDirection: "column",
           zIndex: 71,
           boxShadow: "0 -20px 40px rgba(0,0,0,0.15)",
@@ -1317,16 +1317,14 @@ function AddWidgetSheet({ onClose, onAdd, go }) {
             </div>
           ) : (
             visible.map(d => (
-              <button key={d.id} onClick={() => onAdd(d)}
-                className="g-row--tap"
+              <div key={d.id}
                 style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "12px 14px",
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 12px",
                   background: "var(--n-surface)", borderRadius: 12,
                   boxShadow: "var(--sh-1)", marginBottom: 6,
-                  border: "none", width: "100%", textAlign: "left", cursor: "pointer",
                 }}>
-                <div className="icon-tile icon-tile--lg" style={{background: "var(--n-surface-hover)", fontSize: 18}}>
+                <div className="icon-tile icon-tile--lg" style={{background: "var(--n-surface-hover)", fontSize: 18, flexShrink: 0}}>
                   {d.icon && /^https?:\/\//.test(d.icon)
                     ? <img src={d.icon} alt="" style={{width: 22, height: 22, borderRadius: 4, objectFit: "cover"}}/>
                     : (d.icon || "📦")}
@@ -1334,8 +1332,30 @@ function AddWidgetSheet({ onClose, onAdd, go }) {
                 <div style={{flex: 1, minWidth: 0}}>
                   <div className="t-body" style={{fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>{d.title}</div>
                 </div>
-                <Icon name="plus" size={16} color="var(--n-text-muted)"/>
-              </button>
+                <button
+                  onClick={() => onAdd(d, "list")}
+                  data-add-mode="list"
+                  style={{
+                    border: "none",
+                    background: "var(--n-surface-hover)",
+                    color: "var(--n-text)",
+                    padding: "6px 10px", borderRadius: 8,
+                    fontSize: 12, fontWeight: 500,
+                    cursor: "pointer", whiteSpace: "nowrap",
+                  }}>리스트</button>
+                <button
+                  onClick={() => onAdd(d, "calendar")}
+                  data-add-mode="calendar"
+                  title="날짜 속성을 기준으로 캘린더 뷰를 추가합니다"
+                  style={{
+                    border: "none",
+                    background: "#DDEBF1",
+                    color: "#337EA9",
+                    padding: "6px 10px", borderRadius: 8,
+                    fontSize: 12, fontWeight: 500,
+                    cursor: "pointer", whiteSpace: "nowrap",
+                  }}>캘린더</button>
+              </div>
             ))
           )}
         </div>
@@ -1635,14 +1655,18 @@ function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRe
   const addPickerOpen = React.useRef(false);
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
-  const addDb = (db) => {
-    const key = `db-${db.id}`;
+  const addDb = (db, mode = "list") => {
+    const isCal = mode === "calendar";
+    const key = isCal ? `cal-${db.id}` : `db-${db.id}`;
     if (widgets.find(w => w.key === key)) { setPickerOpen(false); return; }
-    const col = colorForDb(db.id);
+    const col = isCal ? { c: "#DDEBF1", fg: "#337EA9" } : colorForDb(db.id);
     const next = [...widgets, {
-      key, dbId: db.id, dbKey: null,
-      n: db.title, c: col.c, fg: col.fg,
-      icon: db.icon || "📦", sub: "", go: "db-list",
+      key, dbId: db.id, dbKey: isCal ? "calendar" : null,
+      n: isCal ? `${db.title} 캘린더` : db.title,
+      c: col.c, fg: col.fg,
+      icon: isCal ? "📅" : (db.icon || "📦"),
+      sub: "",
+      go: isCal ? "calendar" : "db-list",
     }];
     saveW(next);
     try {
