@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nolio
+
+Mobile-first Notion client built as a Next.js PWA.
 
 ## Getting Started
 
-First, run the development server:
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000/app](http://localhost:3000/app).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Notion OAuth
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The app supports Notion OAuth for general users and keeps the access token in an encrypted `HttpOnly` cookie. Browser JavaScript does not read the OAuth access token.
 
-## Learn More
+1. Create a Notion public integration in the Notion developer dashboard.
+2. Add this redirect URI to the integration:
 
-To learn more about Next.js, take a look at the following resources:
+```text
+https://notion-to-lean.vercel.app/api/oauth/notion/callback
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Add these Vercel Production environment variables:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```text
+NOTION_OAUTH_CLIENT_ID
+NOTION_OAUTH_CLIENT_SECRET
+NOTION_OAUTH_REDIRECT_URI=https://notion-to-lean.vercel.app/api/oauth/notion/callback
+NOTION_SESSION_SECRET
+NEXT_PUBLIC_APP_URL=https://notion-to-lean.vercel.app
+```
+
+`NOTION_SESSION_SECRET` should be a long random value. Do not commit real secrets.
+
+4. Redeploy production.
+
+```bash
+pnpm dlx vercel@51.8.0 deploy --prod --yes
+```
+
+5. Visit `/app`, choose `Notion으로 계속`, authorize the workspace, then map databases in `DB 선택`.
+
+## User DB Mapping
+
+After OAuth login, each user can assign their own databases to the app roles:
+
+- `태스크`
+- `웍스`
+- `인사이트`
+- `가계부`
+- `스크립트`
+
+The mapping is stored in an encrypted `HttpOnly` cookie and is used by `/api/tasks`, `/api/works`, `/api/insights`, `/api/finance`, `/api/reflection`, and `/api/metrics/weekly`.
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Production URL:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[https://notion-to-lean.vercel.app/app](https://notion-to-lean.vercel.app/app)
