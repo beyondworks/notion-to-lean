@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nolio-pwa-v5-20260424";
+const CACHE_VERSION = "nolio-pwa-v6-20260424";
 const APP_SHELL = [
   "/manifest.json",
   "/offline.html",
@@ -44,12 +44,9 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-function isMutableAppAsset(pathname) {
-  const decoded = decodeURIComponent(pathname);
-  return pathname === "/app"
-    || decoded === "/design/Notion Mobile App.html"
-    || pathname.startsWith("/design/src/")
-    || pathname.startsWith("/design/styles/");
+/** Content-hash paths are immutable and safe to cache-first */
+function isImmutableAsset(pathname) {
+  return pathname.startsWith("/_next/static/");
 }
 
 async function putOk(req, res) {
@@ -90,10 +87,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isMutableAppAsset(url.pathname)) {
-    event.respondWith(networkFirst(req));
+  if (isImmutableAsset(url.pathname)) {
+    event.respondWith(cacheFirst(req));
     return;
   }
 
-  event.respondWith(cacheFirst(req));
+  event.respondWith(networkFirst(req));
 });
