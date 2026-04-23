@@ -43,3 +43,8 @@ next-env.d.ts
 # local tool state
 .claude/
 .omc/
+.omx/
+.playwright-mcp/
+/fix-*.png
+/us000-*.png
+/us-*.png
