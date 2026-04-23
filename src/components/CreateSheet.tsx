@@ -2,18 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useMutation } from '@/lib/hooks';
+import { DB_IDS } from '@/lib/db-ids';
 
 type Mode = 'task' | 'memo' | 'project' | 'expense';
 
 const STATUS_OPTIONS = ['To Do', 'In Progress', 'Done'] as const;
-
-// DB IDs must match the server-side constants but are sent as payload
-const DB_IDS = {
-  TASKS: '242003c7-f7be-804a-9d6e-f76d5d0347b4',
-  TIMELINE: '28f003c7-f7be-8080-85b4-d73efe3cb896',
-  INSIGHTS: '241003c7-f7be-800b-b71c-df3acddc5bb8',
-  WORKS: '241003c7-f7be-8011-8ba4-cecf131df2a0',
-} as const;
 
 interface CreateSheetProps {
   open: boolean;

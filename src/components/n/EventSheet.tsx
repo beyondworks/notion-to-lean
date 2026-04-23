@@ -6,7 +6,7 @@ import { Toggle } from './Toggle';
 import { Assignees } from './Avatar';
 import { GroupList } from './GroupedList';
 import { useMutation } from '@/lib/hooks';
-import { DB_IDS_CLIENT } from '@/lib/db-ids';
+import { DB_IDS } from '@/lib/db-ids';
 
 interface EventSheetProps {
   open: boolean;
@@ -42,7 +42,7 @@ export default function EventSheet({ open, onClose, onCreated }: EventSheetProps
 
   const handleSave = async () => {
     if (!title.trim()) return;
-    const result = await mutate({ dbId: DB_IDS_CLIENT.TASKS, title: title.trim() });
+    const result = await mutate({ dbId: DB_IDS.TASKS, title: title.trim() });
     if (result) {
       onCreated?.(title.trim());
       onClose();
