@@ -99,6 +99,13 @@
   /* Device frame aliases */
   --app-bg: var(--n-bg-grouped);
   --card-bg: var(--n-surface);
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --nm-keyboard-bottom: 0px;
+  --nm-app-height: 100dvh;
+  --nm-nav-top: 54px;
+  --nm-tabbar-space: calc(100px + var(--safe-b) + var(--nm-keyboard-bottom));
 }
 
 /* ── Dark mode ────────────────────────────────────────── */
@@ -149,7 +156,20 @@
 
 /* ── Base ─────────────────────────────────────────────── */
 * { box-sizing: border-box; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; font-family: var(--f-ui); color: var(--n-text); background: var(--n-bg-grouped); }
+html, body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--f-ui);
+  color: var(--n-text);
+  background: var(--n-bg-grouped);
+}
+
+@media (max-width: 500px) {
+  :root {
+    --nm-nav-top: max(44px, calc(var(--safe-t) + 12px));
+    --nm-tabbar-space: calc(92px + var(--safe-b) + var(--nm-keyboard-bottom));
+  }
+}
 
 /* Text utility classes */
 .t-large-title { font-size: var(--fs-large-title); line-height: var(--lh-large-title); font-weight: var(--fw-bold); letter-spacing: -0.5px; color: var(--n-text-strong); }
@@ -299,7 +319,10 @@ html, body { margin: 0; font-family: var(--f-ui); color: var(--n-text); backgrou
 
 /* Tab bar (liquid glass bottom dock) */
 .tabbar {
-  position: absolute; left: 12px; right: 12px; bottom: 18px;
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + var(--safe-b) + var(--nm-keyboard-bottom));
   height: 62px;
   border-radius: 22px;
   display: grid; grid-template-columns: repeat(5, 1fr);
@@ -362,6 +385,14 @@ html, body { margin: 0; font-family: var(--f-ui); color: var(--n-text); backgrou
 
 /* Prevent long URLs/content from overflowing cards */
 .t-body, .t-headline, .t-footnote, .t-callout, .t-subhead { overflow-wrap: anywhere; word-break: break-word; }
+/* Opt-out: element-level `white-space: nowrap` wins over the global break rule
+   (otherwise words like `Beyond_Tasks` split across two lines inside 134px
+   bento cards). Used by the home DB card titles. */
+.t-headline[style*="nowrap"], .t-body[style*="nowrap"], .t-footnote[style*="nowrap"],
+[style*="white-space: nowrap"], [style*="white-space:nowrap"] {
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
+}
 
 
 /* ── Font size scale (set via data-font-size on html) ── */
@@ -425,13 +456,13 @@ html[data-font-size="아주 크게"] {
 
 
 /* Subtle bottom padding on page content so last row doesn't sit right under the dock */
-.page-content { padding-bottom: calc(110px + var(--safe-b)); }
+.page-content { padding-bottom: var(--nm-tabbar-space); }
 
 
 
 
 /* Content fade under tab bar — uses mask, not color overlay */
 .scroll-fade {
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 110px), transparent 100%);
-          mask-image: linear-gradient(to bottom, black calc(100% - 110px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - var(--nm-tabbar-space)), transparent 100%);
+          mask-image: linear-gradient(to bottom, black calc(100% - var(--nm-tabbar-space)), transparent 100%);
 }

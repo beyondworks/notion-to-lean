@@ -28,6 +28,388 @@ window.t = t;
 
 const { useState, useEffect, useRef, useMemo } = React;
 
+/* ── Notion connection state ─────────────────────────── */
+window.NM_OWNER_DB_IDS = window.NM_OWNER_DB_IDS || {
+  tasks: "242003c7-f7be-804a-9d6e-f76d5d0347b4",
+  calendar: "242003c7-f7be-804a-9d6e-f76d5d0347b4",
+  works: "241003c7-f7be-8011-8ba4-cecf131df2a0",
+  insights: "241003c7-f7be-800b-b71c-df3acddc5bb8",
+  finance: "28f003c7-f7be-8080-85b4-d73efe3cb896",
+  reflection: "31e003c7-f7be-80a0-ab4f-c1e2249f3c24",
+};
+
+window.NM_CORE_DB_KEYS = window.NM_CORE_DB_KEYS || ["tasks", "calendar", "works", "insights", "finance", "reflection"];
+window.NM_EMPTY_DB_MESSAGE = "노션에서 데이터베이스를 추가해주세요";
+
+window.nmSanitizeCoreDbMap = function nmSanitizeCoreDbMap(mapping) {
+  const allowed = new Set(window.NM_CORE_DB_KEYS || []);
+  const clean = {};
+  Object.entries(mapping || {}).forEach(([key, value]) => {
+    const id = typeof value === "string" ? value.trim() : "";
+    if (allowed.has(key) && id) clean[key] = id;
+  });
+
+  const byId = {};
+  Object.entries(clean).forEach(([key, id]) => {
+    byId[id] = byId[id] || [];
+    byId[id].push(key);
+  });
+
+  const droppedKeys = new Set();
+  Object.entries(byId).forEach(([_, keys]) => {
+    const allowedPair = keys.every(k => k === "tasks" || k === "calendar");
+    if (keys.length > 1 && !allowedPair) keys.forEach(k => droppedKeys.add(k));
+  });
+
+  droppedKeys.forEach(key => delete clean[key]);
+  return { map: clean, unsafe: droppedKeys.size > 0, droppedKeys: [...droppedKeys] };
+};
+
+window.nmStableDbMapJson = function nmStableDbMapJson(map) {
+  const ordered = {};
+  Object.keys(map || {}).sort().forEach(key => {
+    ordered[key] = map[key];
+  });
+  return JSON.stringify(ordered);
+};
+
+window.nmLoadCoreDbMap = function nmLoadCoreDbMap() {
+  let raw = {};
+  try { raw = JSON.parse(localStorage.getItem("nm-core-db-map") || "{}") || {}; } catch {}
+  const result = window.nmSanitizeCoreDbMap(raw);
+  if (result.unsafe) {
+    try {
+      if (Object.keys(result.map).length) localStorage.setItem("nm-core-db-map", JSON.stringify(result.map));
+      else localStorage.removeItem("nm-core-db-map");
+    } catch {}
+  }
+  return result.map;
+};
+
+window.nmConnectionMode = function nmConnectionMode() {
+  return localStorage.getItem("nm-connection-mode") || "demo";
+};
+
+window.nmGetNotionToken = function nmGetNotionToken() {
+  return localStorage.getItem("nm-notion-token") || "";
+};
+
+window.nmApiHeaders = function nmApiHeaders(extra = {}) {
+  const headers = {...extra};
+  const mode = window.nmConnectionMode();
+  if (mode === "demo") headers["x-nm-demo-mode"] = "1";
+  const token = mode === "custom" ? window.nmGetNotionToken() : "";
+  if (token) headers["x-nm-notion-token"] = token;
+  return headers;
+};
+
+window.nmCoreDbId = function nmCoreDbId(key) {
+  const map = window.nmLoadCoreDbMap ? window.nmLoadCoreDbMap() : {};
+  if (map[key]) return map[key];
+  if (key === "calendar" && map.tasks) return map.tasks;
+  return window.nmConnectionMode() === "owner" ? (window.NM_OWNER_DB_IDS[key] || null) : null;
+};
+
+window.nmCoreEndpoint = function nmCoreEndpoint(key) {
+  const pathByKey = {
+    tasks: "/api/tasks",
+    calendar: "/api/tasks",
+    works: "/api/works",
+    insights: "/api/insights",
+    finance: "/api/finance",
+    reflection: "/api/reflection",
+  };
+  const path = pathByKey[key] || key;
+  const dbId = window.nmCoreDbId(key);
+  if (!dbId) return path;
+  const url = new URL(path, window.location.origin);
+  url.searchParams.set("dbId", dbId);
+  return `${url.pathname}${url.search}`;
+};
+
+window.nmSetConnection = function nmSetConnection(mode, token = "") {
+  const previousMode = localStorage.getItem("nm-connection-mode");
+  const previousToken = localStorage.getItem("nm-notion-token") || "";
+  const tokenChanged = mode === "custom" && token && previousMode === "custom" && previousToken && previousToken !== token;
+  if ((previousMode && previousMode !== mode) || tokenChanged) {
+    localStorage.removeItem("nm-workspace-key");
+    window.nmClearWorkspaceLocalState?.();
+  }
+  localStorage.setItem("nm-connection-mode", mode);
+  localStorage.setItem("nm-onboarded", "1");
+  if (mode === "custom" && token) localStorage.setItem("nm-notion-token", token);
+  if (mode !== "custom") localStorage.removeItem("nm-notion-token");
+  window.nmInvalidate && window.nmInvalidate();
+  window.dispatchEvent(new CustomEvent("nm-connection-update", { detail: { mode } }));
+};
+
+window.nmClearWorkspaceLocalState = function nmClearWorkspaceLocalState() {
+  const keepKeys = new Set([
+    "nm-onboarded",
+    "nm-connection-mode",
+    "nm-oauth-configured",
+    "nm-notion-token",
+    "nm-notion-profile",
+    "nm-profile-name",
+    "nm-profile-workspace",
+    "nm-profile-plan",
+    "nm-profile-avatar",
+    "nm-dark",
+    "nm-font-size",
+    "nm-lang",
+  ]);
+  Object.keys(localStorage).forEach(key => {
+    if (keepKeys.has(key)) return;
+    if (
+      key === "nm-pinned-dbs" ||
+      key === "nm-home-widgets" ||
+      key === "nm-bento-widgets" ||
+      key === "nm-sections" ||
+      key === "nm-core-db-map" ||
+      key === "nm-db-list-cache" ||
+      key === "nm-recent-pages" ||
+      key.startsWith("nm-section-") ||
+      key.startsWith("nm-db-alias-") ||
+      key.startsWith("nm-db-filter-")
+    ) {
+      localStorage.removeItem(key);
+    }
+  });
+  window.__nmDbListCache = null;
+  window.__nmCache?.clear?.();
+  window.__nmInflight?.clear?.();
+};
+
+window.nmRefreshSession = async function nmRefreshSession() {
+  try {
+    const res = await fetch("/api/user/session", { headers: window.nmApiHeaders() });
+    if (!res.ok) return null;
+    const json = await res.json();
+    localStorage.setItem("nm-oauth-configured", json.oauthConfigured ? "1" : "0");
+    if (json.connected) {
+      const previousMode = localStorage.getItem("nm-connection-mode");
+      const previousWorkspace = localStorage.getItem("nm-workspace-key");
+      const nextWorkspace = json.profile?.workspaceId || json.profile?.workspaceName || "oauth";
+      const mappingResult = json.mapping && Object.keys(json.mapping).length
+        ? window.nmSanitizeCoreDbMap(json.mapping)
+        : { map: {} };
+      const mappingCount = Object.keys(mappingResult.map).length;
+      const previousMapRaw = window.nmStableDbMapJson(window.nmLoadCoreDbMap?.() || {});
+      const nextMapRaw = window.nmStableDbMapJson(mappingResult.map);
+      const hasWorkspaceLocalState = Boolean(
+        localStorage.getItem("nm-pinned-dbs") ||
+        localStorage.getItem("nm-home-widgets") ||
+        localStorage.getItem("nm-sections") ||
+        localStorage.getItem("nm-core-db-map") ||
+        localStorage.getItem("nm-db-list-cache") ||
+        Object.keys(localStorage).some(key => key.startsWith("nm-section-"))
+      );
+      const shouldClearOldHome =
+        (previousWorkspace && previousWorkspace !== nextWorkspace) ||
+        (!previousWorkspace && hasWorkspaceLocalState) ||
+        (previousWorkspace === nextWorkspace && previousMapRaw !== nextMapRaw && hasWorkspaceLocalState);
+      if (shouldClearOldHome) window.nmClearWorkspaceLocalState?.();
+      localStorage.setItem("nm-workspace-key", nextWorkspace);
+      localStorage.setItem("nm-connection-mode", "oauth");
+      localStorage.setItem("nm-onboarded", "1");
+      if (json.profile?.workspaceName) {
+        localStorage.setItem("nm-profile-name", json.profile.workspaceName);
+        localStorage.setItem("nm-profile-workspace", json.profile.workspaceName);
+      }
+      if (mappingCount) {
+        if (Object.keys(mappingResult.map).length) localStorage.setItem("nm-core-db-map", JSON.stringify(mappingResult.map));
+        else localStorage.removeItem("nm-core-db-map");
+      } else {
+        localStorage.removeItem("nm-core-db-map");
+      }
+      window.nmInvalidate && window.nmInvalidate();
+    }
+    return json;
+  } catch {
+    return null;
+  }
+};
+
+window.nmSaveDbMapping = async function nmSaveDbMapping(mapping) {
+  const result = window.nmSanitizeCoreDbMap(mapping || {});
+  const previousMapRaw = window.nmStableDbMapJson(window.nmLoadCoreDbMap?.() || {});
+  const nextMapRaw = window.nmStableDbMapJson(result.map);
+  if (previousMapRaw !== nextMapRaw) {
+    window.nmClearWorkspaceLocalState?.();
+  }
+  localStorage.setItem("nm-core-db-map", JSON.stringify(result.map));
+  if (window.nmConnectionMode() !== "oauth") return { ok: true, mapping };
+  const res = await fetch("/api/user/mapping", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mapping: result.map }),
+  });
+  return res.ok ? res.json() : { ok: false };
+};
+
+window.nmLogoutNotion = async function nmLogoutNotion() {
+  try { await fetch("/api/oauth/notion/logout", { method: "POST" }); } catch {}
+  localStorage.removeItem("nm-notion-token");
+  localStorage.removeItem("nm-notion-profile");
+  localStorage.removeItem("nm-profile-workspace");
+  localStorage.removeItem("nm-core-db-map");
+  localStorage.removeItem("nm-workspace-key");
+  window.nmClearWorkspaceLocalState?.();
+  localStorage.setItem("nm-connection-mode", "demo");
+  window.nmInvalidate && window.nmInvalidate();
+};
+
+if (!window.__nmNativeFetch) {
+  window.__nmNativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    const url = typeof input === "string" ? input : input?.url;
+    const u = url ? new URL(url, window.location.href) : null;
+    const isLocalApi = u && u.origin === window.location.origin && u.pathname.startsWith("/api/");
+    if (!isLocalApi) return window.__nmNativeFetch(input, init);
+
+    const headers = new Headers(init.headers || {});
+    const authHeaders = window.nmApiHeaders();
+    Object.entries(authHeaders).forEach(([k, v]) => {
+      if (v && !headers.has(k)) headers.set(k, v);
+    });
+    return window.__nmNativeFetch(input, { ...init, headers });
+  };
+}
+
+/* ──────────────────────────────────────────────────────────
+ *  SWR-like fetch cache
+ *  - returns cached data synchronously on re-navigation
+ *  - revalidates stale entries in the background
+ *  - dedupes in-flight requests
+ *  - broadcasts "nm-cache-update" events so subscribers can refresh
+ * ────────────────────────────────────────────────────────── */
+window.__nmCache = window.__nmCache || new Map();      // url → { data, at }
+window.__nmInflight = window.__nmInflight || new Map(); // url → Promise
+
+function nmCacheKey(url) {
+  const tokenKey = window.nmConnectionMode() === "custom" && window.nmGetNotionToken()
+    ? window.nmGetNotionToken().slice(-8)
+    : window.nmConnectionMode();
+  return `${url}::${tokenKey}`;
+}
+
+/**
+ * nmFetch(url, { ttl }) — returns a Promise for {json}.
+ * If cache has an entry, returns it immediately (Promise.resolve) AND triggers
+ * background revalidate when stale. Otherwise does a network fetch.
+ */
+window.nmFetch = function nmFetch(url, opts = {}) {
+  const ttl = opts.ttl == null ? 30000 : opts.ttl;
+  const now = Date.now();
+  const key = nmCacheKey(url);
+  const cached = window.__nmCache.get(key);
+
+  const revalidate = () => {
+    if (window.__nmInflight.has(key)) return window.__nmInflight.get(key);
+    const p = fetch(url)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data != null) {
+          window.__nmCache.set(key, { data, at: Date.now() });
+          window.dispatchEvent(new CustomEvent("nm-cache-update", { detail: { url, data } }));
+        }
+        window.__nmInflight.delete(key);
+        return data;
+      })
+      .catch(err => {
+        window.__nmInflight.delete(key);
+        return cached?.data ?? null;
+      });
+    window.__nmInflight.set(key, p);
+    return p;
+  };
+
+  if (cached) {
+    const isStale = (now - cached.at) > ttl;
+    if (isStale) revalidate(); // fire-and-forget background refresh
+    return Promise.resolve(cached.data);
+  }
+  return revalidate();
+};
+
+/** Invalidate one URL or all URLs matching a prefix. */
+window.nmInvalidate = function nmInvalidate(urlOrPrefix) {
+  if (!urlOrPrefix) { window.__nmCache.clear(); window.__nmInflight.clear(); return; }
+  for (const k of Array.from(window.__nmCache.keys())) {
+    if (k === urlOrPrefix || k.startsWith(urlOrPrefix)) window.__nmCache.delete(k);
+  }
+};
+
+/** React hook — returns current cached data, updates on revalidate. */
+window.useNmFetch = function useNmFetch(url, opts = {}) {
+  const initial = url ? (window.__nmCache.get(nmCacheKey(url))?.data ?? null) : null;
+  const [data, setData] = useState(initial);
+  useEffect(() => {
+    if (!url) return;
+    let mounted = true;
+    window.nmFetch(url, opts).then(d => { if (mounted && d != null) setData(d); });
+    const onUpdate = (e) => {
+      if (e.detail.url === url && mounted) setData(e.detail.data);
+    };
+    window.addEventListener("nm-cache-update", onUpdate);
+    return () => { mounted = false; window.removeEventListener("nm-cache-update", onUpdate); };
+  }, [url]);
+  return data;
+};
+
+window.nmToast = function nmToast(message) {
+  window.dispatchEvent(new CustomEvent("nm-toast", { detail: { message } }));
+};
+
+window.nmCopyText = async function nmCopyText(text) {
+  if (!text) return false;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {}
+  return false;
+};
+
+window.nmLoadRecentPages = function nmLoadRecentPages(limit = 4) {
+  try {
+    const rows = JSON.parse(localStorage.getItem("nm-recent-pages") || "[]");
+    return Array.isArray(rows)
+      ? rows.filter(r => r && r.id).slice(0, limit)
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+window.nmTrackRecentPage = function nmTrackRecentPage(page) {
+  if (!page?.id) return;
+  const row = {
+    id: page.id,
+    n: page.title || page.n || "(제목 없음)",
+    sub: page.sub || page.category || page.dbTitle || "페이지",
+    icon: page.icon || "📄",
+    at: Date.now(),
+  };
+  let rows = [];
+  try { rows = JSON.parse(localStorage.getItem("nm-recent-pages") || "[]"); } catch {}
+  if (!Array.isArray(rows)) rows = [];
+  rows = [row, ...rows.filter(r => r?.id !== row.id)].slice(0, 20);
+  localStorage.setItem("nm-recent-pages", JSON.stringify(rows));
+  window.dispatchEvent(new CustomEvent("nm-recent-update", { detail: row }));
+};
+
+window.nmRemoveRecentPage = function nmRemoveRecentPage(pageId) {
+  if (!pageId) return;
+  let rows = [];
+  try { rows = JSON.parse(localStorage.getItem("nm-recent-pages") || "[]"); } catch {}
+  if (!Array.isArray(rows)) return;
+  rows = rows.filter(r => r?.id !== pageId);
+  localStorage.setItem("nm-recent-pages", JSON.stringify(rows));
+  window.dispatchEvent(new CustomEvent("nm-recent-update", { detail: null }));
+};
+
 /* ── Icons (SF Symbol style, stroke 1.8) ─────────────── */
 function Icon({ name, size = 22, color = "currentColor", strokeWidth = 1.8 }) {
   const s = { width: size, height: size, display: "inline-block", flexShrink: 0 };
@@ -44,6 +426,7 @@ function Icon({ name, size = 22, color = "currentColor", strokeWidth = 1.8 }) {
     case "more":    return <svg style={s} viewBox="0 0 22 22"><circle cx="5" cy="11" r="1.6" fill={color}/><circle cx="11" cy="11" r="1.6" fill={color}/><circle cx="17" cy="11" r="1.6" fill={color}/></svg>;
     case "filter":  return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M3 6 H19 M6 11 H16 M9 16 H13"/></svg>;
     case "share":   return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M11 3 V14 M7 7 L11 3 L15 7 M4 14 V18 a1 1 0 0 0 1 1 H17 a1 1 0 0 0 1 -1 V14"/></svg>;
+    case "link":    return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M9 7 L10.5 5.5 a4 4 0 0 1 5.7 5.7 L14.5 13 M13 15 L11.5 16.5 a4 4 0 0 1 -5.7 -5.7 L7.5 9 M8.5 13.5 L13.5 8.5"/></svg>;
     case "chev-r":  return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M8 5 L14 11 L8 17"/></svg>;
     case "chev-d":  return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M5 8 L11 14 L17 8"/></svg>;
     case "chev-u":  return <svg style={s} viewBox="0 0 22 22"><path {...p} d="M5 14 L11 8 L17 14"/></svg>;
@@ -116,7 +499,10 @@ function Phone({ children, dark, style }) {
   const isMobile = useIsMobile();
   const frame = isMobile
     ? {
-        width: "100vw", height: "100vh", borderRadius: 0,
+        width: "100vw",
+        height: "var(--nm-app-height, 100dvh)",
+        minHeight: "var(--nm-app-height, 100dvh)",
+        borderRadius: 0,
         overflow: "hidden", position: "relative",
         background: "var(--n-bg-grouped)", boxShadow: "none",
         ...style,
@@ -134,6 +520,7 @@ function Phone({ children, dark, style }) {
       <div style={{position: "absolute", top: 0, bottom: 0, left: 0, right: 0, display: "flex", flexDirection: "column"}}>
         {children}
       </div>
+      <ToastHost/>
       {!isMobile && <HomeIndicator/>}
     </div>
   );
@@ -143,7 +530,7 @@ function Phone({ children, dark, style }) {
 function NavBar({ title, large = true, left, right, subtitle, onScrollCollapse = false }) {
   return (
     <div style={{
-      paddingTop: 54,
+      paddingTop: "var(--nm-nav-top, 54px)",
       background: onScrollCollapse ? "transparent" : "var(--n-bg-grouped)",
     }}>
       <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", minHeight: 44}}>
@@ -173,7 +560,7 @@ function NavIconBtn({ icon, onClick, badge }) {
       position: "relative",
     }}>
       <Icon name={icon} size={18}/>
-      {badge && <span style={{position: "absolute", top: 2, right: 2, width: 8, height: 8, borderRadius: 4, background: "#E0322C", border: "1.5px solid var(--n-bg-grouped)"}}/>}
+      {badge && <span style={{position: "absolute", top: 2, right: 2, width: 8, height: 8, borderRadius: 4, background: "var(--n-accent)", border: "1.5px solid var(--n-bg-grouped)"}}/>}
     </button>
   );
 }
@@ -220,7 +607,90 @@ function Toggle({ on, onChange }) {
 }
 
 /* ── Spacer for scroll content above tab bar ─────────── */
-function TabSpacer() { return <div style={{height: 100}}/>; }
+function TabSpacer() { return <div style={{height: "var(--nm-tabbar-space, 100px)"}}/>; }
+
+function ActionSheet({ open, title, subtitle, onClose, children }) {
+  if (!open) return null;
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{position: "absolute", inset: 0, background: "rgba(0,0,0,0.28)", zIndex: 80}}
+      />
+      <div
+        className="glass"
+        style={{
+          position: "absolute", left: 10, right: 10,
+          bottom: "calc(10px + var(--safe-b, env(safe-area-inset-bottom, 0px)) + var(--nm-keyboard-bottom, 0px))",
+          zIndex: 81,
+          borderRadius: 24, padding: "8px 0 12px",
+          overflow: "hidden",
+          maxHeight: "calc(78dvh - var(--nm-keyboard-bottom, 0px))",
+          display: "flex", flexDirection: "column",
+        }}
+      >
+        <div style={{display: "grid", placeItems: "center", padding: "4px 0 8px"}}>
+          <div style={{width: 36, height: 5, borderRadius: 3, background: "var(--n-border-strong)"}}/>
+        </div>
+        {(title || subtitle) && (
+          <div style={{padding: "0 18px 12px"}}>
+            {title && <div className="t-headline">{title}</div>}
+            {subtitle && <div className="t-footnote" style={{marginTop: 2}}>{subtitle}</div>}
+          </div>
+        )}
+        <div style={{overflowY: "auto"}}>{children}</div>
+      </div>
+    </>
+  );
+}
+
+function ActionRow({ icon, title, subtitle, tone = "default", onClick, right }) {
+  const color = tone === "danger" ? "#D44C47" : "var(--n-text-strong)";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: "100%", minHeight: 54, display: "flex", alignItems: "center", gap: 12,
+        padding: "10px 18px", border: "none", background: "transparent",
+        color, font: "inherit", textAlign: "left", cursor: "pointer",
+      }}
+    >
+      {icon && <Icon name={icon} size={19} color={color}/>}
+      <span style={{flex: 1, minWidth: 0}}>
+        <span className="t-body" style={{display: "block", fontWeight: 600, color}}>{title}</span>
+        {subtitle && <span className="t-footnote" style={{display: "block", marginTop: 1}}>{subtitle}</span>}
+      </span>
+      {right}
+    </button>
+  );
+}
+
+function ToastHost() {
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    let timer;
+    const onToast = (e) => {
+      setMsg(e.detail?.message || "");
+      clearTimeout(timer);
+      timer = setTimeout(() => setMsg(""), 1800);
+    };
+    window.addEventListener("nm-toast", onToast);
+    return () => { clearTimeout(timer); window.removeEventListener("nm-toast", onToast); };
+  }, []);
+  if (!msg) return null;
+  return (
+    <div
+      className="glass"
+      style={{
+        position: "absolute", left: "50%", bottom: 88, transform: "translateX(-50%)",
+        zIndex: 90, borderRadius: 18, padding: "9px 14px",
+        maxWidth: "78%", color: "var(--n-text-strong)", fontSize: 13, fontWeight: 600,
+        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      }}
+    >{msg}</div>
+  );
+}
 
 /* ── Avatar ──────────────────────────────────────────── */
 function Avatar({ name, size = 24, color }) {
@@ -235,4 +705,5 @@ function Avatar({ name, size = 24, color }) {
 
 Object.assign(window, {
   Icon, StatusBar, HomeIndicator, Phone, NavBar, NavIconBtn, TabBar, Toggle, TabSpacer, Avatar,
+  ActionSheet, ActionRow, ToastHost,
 });

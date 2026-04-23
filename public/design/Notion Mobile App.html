@@ -2,21 +2,62 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Notion Mobile · iOS 26</title>
-<link rel="stylesheet" href="styles/notion-ios.css"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#F1EEE7" id="meta-theme-color-light" media="(prefers-color-scheme: light)"/>
+<meta name="theme-color" content="#0E0E0E" id="meta-theme-color-dark" media="(prefers-color-scheme: dark)"/>
+<meta name="theme-color" content="#F1EEE7" id="meta-theme-color"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Nolio"/>
+<title>Nolio · iOS 26</title>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="icon" type="image/png" href="/favicon.png"/>
+<script>
+  // Keep localStorage-backed custom DB layout on the canonical dev origin.
+  // localhost and 127.0.0.1 have separate storage, so 127 shows a fresh layout.
+  if (location.hostname === "127.0.0.1") {
+    location.replace(location.href.replace("//127.0.0.1", "//localhost"));
+  }
+
+  function nmSyncViewportMetrics() {
+    const vv = window.visualViewport;
+    const height = vv ? vv.height : window.innerHeight;
+    const offsetTop = vv ? vv.offsetTop : 0;
+    const keyboard = Math.max(0, window.innerHeight - height - offsetTop);
+    document.documentElement.style.setProperty("--nm-app-height", `${height}px`);
+    document.documentElement.style.setProperty("--nm-keyboard-bottom", `${keyboard}px`);
+  }
+  nmSyncViewportMetrics();
+  window.addEventListener("resize", nmSyncViewportMetrics, { passive: true });
+  window.addEventListener("orientationchange", nmSyncViewportMetrics, { passive: true });
+  window.visualViewport?.addEventListener("resize", nmSyncViewportMetrics, { passive: true });
+  window.visualViewport?.addEventListener("scroll", nmSyncViewportMetrics, { passive: true });
+</script>
+<link rel="stylesheet" href="/design/styles/notion-ios.css"/>
 <style>
-  html, body { min-height: 100vh; }
+  html {
+    min-height: 100dvh;
+    width: 100%;
+    background: radial-gradient(1200px 700px at 50% 0%, #F1EEE7 0%, #E8E3D8 55%, #DDD6C7 100%);
+  }
+  body { min-height: 100dvh; width: 100%; margin: 0; }
   body {
     background: radial-gradient(1200px 700px at 50% 0%, #F1EEE7 0%, #E8E3D8 55%, #DDD6C7 100%);
     overflow-x: hidden;
     font-family: var(--f-ui);
   }
+  [data-theme="dark"] html {
+    background: radial-gradient(1200px 700px at 50% 0%, #262626 0%, #181818 55%, #0E0E0E 100%);
+  }
   [data-theme="dark"] body {
     background: radial-gradient(1200px 700px at 50% 0%, #262626 0%, #181818 55%, #0E0E0E 100%);
   }
   .stage {
-    min-height: 100vh;
+    width: 100%;
+    min-width: 100%;
+    min-height: 100dvh;
     display: flex; align-items: center; justify-content: center;
     padding: 40px 20px 60px;
     gap: 48px;
@@ -69,6 +110,11 @@
   }
   .screen-btn.on { background: var(--n-accent); color: var(--n-bg); }
 
+  @keyframes nm-shimmer {
+    0% { background-position: 160% 0; }
+    100% { background-position: -60% 0; }
+  }
+
   /* Tweaks panel */
   .tweaks-panel {
     position: fixed; right: 20px; bottom: 80px; z-index: 100;
@@ -87,23 +133,23 @@
   /* ── Mobile: strip desktop-preview chrome ────────────── */
   @media (max-width: 500px) {
     body { overflow: hidden; }
-    .stage { padding: 0; gap: 0; min-height: 0; }
+    .stage { padding: 0; gap: 0; min-height: var(--nm-app-height, 100dvh); width: 100vw; min-width: 100vw; }
     .stage-label, .toolbar, .screen-picker { display: none !important; }
-    #phone-root { width: 100vw; height: 100vh; }
+    #phone-root { width: 100vw; height: var(--nm-app-height, 100dvh); }
   }
 </style>
 </head>
 <body>
 
 <div class="stage-label">
-  <span>◆ Notion × iOS 26</span>
+  <span>◆ Nolio × iOS 26</span>
   <span style="color: var(--n-text-muted);">· <span id="screen-name">홈</span></span>
 </div>
 
 <div class="toolbar">
   <button class="tool-btn" id="theme-btn">🌙 다크</button>
-  <a class="tool-btn" href="Design System.html" style="text-decoration: none;">DS</a>
-  <a class="tool-btn" href="Notion Mobile Wireframes.html" style="text-decoration: none;">와이어</a>
+  <a class="tool-btn" href="/design/Design%20System.html" style="text-decoration: none;">DS</a>
+  <a class="tool-btn" href="/design/Notion%20Mobile%20Wireframes.html" style="text-decoration: none;">와이어</a>
 </div>
 
 <div class="stage">
@@ -129,14 +175,14 @@
 </div>
 
 <!-- React -->
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="/vendor/react.production.min.js"></script>
+<script src="/vendor/react-dom.production.min.js"></script>
+<script src="/vendor/babel.min.js"></script>
 
-<script type="text/babel" src="src/app-shared.jsx"></script>
-<script type="text/babel" src="src/app-screens-1.jsx"></script>
-<script type="text/babel" src="src/app-screens-2.jsx"></script>
-<script type="text/babel" src="src/app-screens-3.jsx"></script>
+<script type="text/babel" src="/design/src/app-shared.jsx"></script>
+<script type="text/babel" src="/design/src/app-screens-1.jsx"></script>
+<script type="text/babel" src="/design/src/app-screens-2.jsx"></script>
+<script type="text/babel" src="/design/src/app-screens-3.jsx"></script>
 
 <script type="text/babel">
 const SCREENS = [
@@ -155,12 +201,33 @@ const SCREENS = [
 ];
 
 function App() {
-  const [screen, setScreen] = React.useState(() => localStorage.getItem("nm-screen") || "home");
+  const [screen, setScreen] = React.useState(() => {
+    const onboarded = localStorage.getItem("nm-onboarded") === "1";
+    const hasConnection = !!localStorage.getItem("nm-connection-mode");
+    if (!onboarded && !hasConnection) return "onboarding";
+    return localStorage.getItem("nm-screen") || "home";
+  });
   const [ctx, setCtx] = React.useState({});
   const [history, setHistory] = React.useState([]); // stack of {screen, ctx}
   const [dark, setDark] = React.useState(() => localStorage.getItem("nm-dark") === "1");
 
   React.useEffect(() => { localStorage.setItem("nm-screen", screen); }, [screen]);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthConnected = params.get("notion") === "connected";
+    const oauthError = params.get("oauth_error");
+    if (oauthError && window.nmToast) window.nmToast(`Notion 연결 실패: ${oauthError}`);
+    window.nmRefreshSession?.().then((session) => {
+      if (session?.connected && oauthConnected) {
+        setScreen("db-picker");
+        window.history.replaceState({}, "", "/app");
+      } else if (oauthError) {
+        setScreen("token");
+        window.history.replaceState({}, "", "/app");
+      }
+    });
+  }, []);
 
   // Apply stored UI prefs on mount
   React.useEffect(() => {
@@ -172,6 +239,17 @@ function App() {
   React.useEffect(() => {
     localStorage.setItem("nm-dark", dark ? "1" : "0");
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    // Sync status-bar / browser chrome color to the active theme so the
+    // notch / safe-area reads as dark in dark mode and beige in light mode.
+    const color = dark ? "#0E0E0E" : "#F1EEE7";
+    const meta = document.getElementById("meta-theme-color");
+    if (meta) meta.setAttribute("content", color);
+    // Some browsers read the prefers-color-scheme-scoped variants — update both
+    // so whichever one is active reflects the user's explicit choice.
+    const mLight = document.getElementById("meta-theme-color-light");
+    const mDark = document.getElementById("meta-theme-color-dark");
+    if (mLight) mLight.setAttribute("content", dark ? "#0E0E0E" : "#F1EEE7");
+    if (mDark) mDark.setAttribute("content", dark ? "#0E0E0E" : "#F1EEE7");
     const btn = document.getElementById("theme-btn");
     if (btn) btn.textContent = dark ? "☀ 라이트" : "🌙 다크";
     const cb = document.getElementById("tw-dark");
@@ -209,6 +287,8 @@ function App() {
     setCtx(nextCtx || {});
     setScreen(k);
   };
+  // Expose for tests / debugging
+  React.useEffect(() => { window.__nmGo = go; }, [screen, ctx]);
 
   const goBack = () => {
     setHistory(h => {
@@ -248,6 +328,31 @@ ReactDOM.createRoot(document.getElementById("phone-root")).render(<App/>);
 </script>
 
 <script>
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  let swReloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (swReloading) return;
+    swReloading = true;
+    window.location.reload();
+  });
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js")
+      .then((registration) => {
+        const activate = (worker) => worker && worker.postMessage({ type: "SKIP_WAITING" });
+        if (registration.waiting) activate(registration.waiting);
+        registration.addEventListener("updatefound", () => {
+          const worker = registration.installing;
+          worker?.addEventListener("statechange", () => {
+            if (worker.state === "installed" && navigator.serviceWorker.controller) activate(worker);
+          });
+        });
+      })
+      .catch((err) => {
+        console.warn("Service worker registration failed", err);
+      });
+  });
+}
+
 // Edit Mode protocol — Tweaks
 (function() {
   const TWEAK_DEFAULS = /*EDITMODE-BEGIN*/{

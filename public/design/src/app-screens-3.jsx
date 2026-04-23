@@ -2,28 +2,47 @@
 const { useState: uS3, useEffect: uE3 } = React;
 
 /* ── Recursive block renderer (supports nested children, tables) ── */
-function BlockRenderer({ b, idx, checks, toggleCheck, depth = 0 }) {
+function BlockRenderer({ b, idx, checks, toggleCheck, editBlock, go, depth = 0 }) {
   const indent = depth * 20;
 
   if (b.type === "heading_1" || b.type === "heading_2" || b.type === "heading_3") {
     const fs = b.type === "heading_1" ? 22 : b.type === "heading_2" ? 19 : 17;
-    return <div style={{margin: "16px 0 8px", fontSize: fs, fontWeight: 700, color: "var(--n-text-strong)", paddingLeft: indent}}>{b.content}</div>;
+    return (
+      <EditableText
+        tag="div"
+        value={b.content}
+        className=""
+        style={{margin: "16px 0 8px", fontSize: fs, fontWeight: 700, color: "var(--n-text-strong)", paddingLeft: indent, outline: "none"}}
+        onCommit={(v) => editBlock && editBlock(b.id, v, b.type)}
+      />
+    );
   }
 
   if (b.type === "to_do") {
     return (
       <div style={{paddingLeft: indent}}>
-        <div style={{display: "flex", alignItems: "flex-start", gap: 10, padding: "6px 0", cursor: "pointer"}}
-          onClick={() => toggleCheck(b.id)}>
-          <div style={{
-            width: 16, height: 16, borderRadius: 3, marginTop: 4,
-            border: checks[b.id] ? "none" : "1.5px solid var(--n-border-strong)",
-            background: checks[b.id] ? "var(--n-accent)" : "transparent",
-            display: "grid", placeItems: "center", flexShrink: 0,
-          }}>{checks[b.id] && <Icon name="check" size={11} color="var(--n-bg)"/>}</div>
-          <div className="t-body" style={{textDecoration: checks[b.id] ? "line-through" : "none", color: checks[b.id] ? "var(--n-text-muted)" : "var(--n-text)"}}>{b.content}</div>
+        <div style={{display: "flex", alignItems: "flex-start", gap: 10, padding: "6px 0"}}>
+          <div
+            onClick={() => toggleCheck(b.id)}
+            style={{
+              width: 16, height: 16, borderRadius: 3, marginTop: 4,
+              border: checks[b.id] ? "none" : "1.5px solid var(--n-border-strong)",
+              background: checks[b.id] ? "var(--n-accent)" : "transparent",
+              display: "grid", placeItems: "center", flexShrink: 0, cursor: "pointer",
+            }}>{checks[b.id] && <Icon name="check" size={11} color="var(--n-bg)"/>}</div>
+          <EditableText
+            tag="div"
+            value={b.content}
+            className="t-body"
+            style={{
+              textDecoration: checks[b.id] ? "line-through" : "none",
+              color: checks[b.id] ? "var(--n-text-muted)" : "var(--n-text)",
+              outline: "none", flex: 1,
+            }}
+            onCommit={(v) => editBlock && editBlock(b.id, v, "to_do")}
+          />
         </div>
-        {b.children && b.children.map((c, i) => <BlockRenderer key={c.id || i} b={c} idx={i} checks={checks} toggleCheck={toggleCheck} depth={depth + 1}/>)}
+        {b.children && b.children.map((c, i) => <BlockRenderer key={c.id || i} b={c} idx={i} checks={checks} toggleCheck={toggleCheck} editBlock={editBlock} go={go} depth={depth + 1}/>)}
       </div>
     );
   }
@@ -34,9 +53,15 @@ function BlockRenderer({ b, idx, checks, toggleCheck, depth = 0 }) {
       <div style={{paddingLeft: indent}}>
         <div style={{display: "flex", gap: 8, padding: "4px 0", alignItems: "flex-start"}}>
           <span style={{color: "var(--n-text-muted)", flexShrink: 0, marginTop: 2}}>{bullet}</span>
-          <span className="t-body">{b.content}</span>
+          <EditableText
+            tag="span"
+            className="t-body"
+            style={{outline: "none", flex: 1}}
+            value={b.content}
+            onCommit={(v) => editBlock && editBlock(b.id, v, "bulleted_list_item")}
+          />
         </div>
-        {b.children && b.children.map((c, i) => <BlockRenderer key={c.id || i} b={c} idx={i} checks={checks} toggleCheck={toggleCheck} depth={depth + 1}/>)}
+        {b.children && b.children.map((c, i) => <BlockRenderer key={c.id || i} b={c} idx={i} checks={checks} toggleCheck={toggleCheck} editBlock={editBlock} go={go} depth={depth + 1}/>)}
       </div>
     );
   }
@@ -46,19 +71,35 @@ function BlockRenderer({ b, idx, checks, toggleCheck, depth = 0 }) {
       <div style={{paddingLeft: indent}}>
         <div style={{display: "flex", gap: 8, padding: "4px 0", alignItems: "flex-start"}}>
           <span style={{color: "var(--n-text-muted)", flexShrink: 0, marginTop: 2}}>{idx + 1}.</span>
-          <span className="t-body">{b.content}</span>
+          <EditableText
+            tag="span"
+            className="t-body"
+            style={{outline: "none", flex: 1}}
+            value={b.content}
+            onCommit={(v) => editBlock && editBlock(b.id, v, "numbered_list_item")}
+          />
         </div>
-        {b.children && b.children.map((c, i) => <BlockRenderer key={c.id || i} b={c} idx={i} checks={checks} toggleCheck={toggleCheck} depth={depth + 1}/>)}
+        {b.children && b.children.map((c, i) => <BlockRenderer key={c.id || i} b={c} idx={i} checks={checks} toggleCheck={toggleCheck} editBlock={editBlock} go={go} depth={depth + 1}/>)}
       </div>
     );
   }
 
   if (b.type === "toggle") {
-    return <ToggleBlock b={b} depth={depth} checks={checks} toggleCheck={toggleCheck}/>;
+    return <ToggleBlock b={b} depth={depth} checks={checks} toggleCheck={toggleCheck} editBlock={editBlock}/>;
   }
 
   if (b.type === "quote") {
-    return <blockquote style={{margin: "8px 0", padding: "4px 12px", borderLeft: "3px solid var(--n-border-strong)", color: "var(--n-text-muted)", marginLeft: indent}} className="t-body">{b.content}</blockquote>;
+    return (
+      <blockquote style={{margin: "8px 0", padding: "4px 12px", borderLeft: "3px solid var(--n-border-strong)", color: "var(--n-text-muted)", marginLeft: indent}}>
+        <EditableText
+          tag="span"
+          className="t-body"
+          style={{outline: "none"}}
+          value={b.content}
+          onCommit={(v) => editBlock && editBlock(b.id, v, "quote")}
+        />
+      </blockquote>
+    );
   }
 
   if (b.type === "divider") {
@@ -77,7 +118,13 @@ function BlockRenderer({ b, idx, checks, toggleCheck, depth = 0 }) {
         marginLeft: indent,
       }}>
         {b.icon && <span style={{flexShrink: 0}}>{b.icon}</span>}
-        <div className="t-body" style={{flex: 1}}>{b.content}</div>
+        <EditableText
+          tag="div"
+          className="t-body"
+          style={{flex: 1, outline: "none"}}
+          value={b.content}
+          onCommit={(v) => editBlock && editBlock(b.id, v, "callout")}
+        />
       </div>
     );
   }
@@ -208,7 +255,11 @@ function BlockRenderer({ b, idx, checks, toggleCheck, depth = 0 }) {
           <div style={{background: "var(--n-surface)", borderRadius: 10, overflow: "hidden", border: "1px solid var(--n-border)"}}>
             {entries.map((e, i) => (
               <div key={e.id || i}
-                onClick={(ev) => { ev.stopPropagation(); if (e.url) window.open(e.url, "_blank"); }}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  if (e.id && go) go("page", { id: e.id });
+                  else if (e.url) window.open(e.url, "_blank");
+                }}
                 style={{
                   padding: "10px 12px",
                   borderTop: i > 0 ? "0.5px solid var(--n-border)" : "none",
@@ -244,20 +295,77 @@ function BlockRenderer({ b, idx, checks, toggleCheck, depth = 0 }) {
   }
 
   // paragraph / default
+  // Render empty paragraphs with a min-height so they're still clickable/editable
+  if (b.type === "paragraph" || !b.type) {
+    return (
+      <EditableText
+        tag="p"
+        className="t-body"
+        style={{margin: "8px 0", paddingLeft: indent, outline: "none", minHeight: "1.4em"}}
+        value={b.content || ""}
+        placeholder=" "
+        onCommit={(v) => editBlock && editBlock(b.id, v, "paragraph")}
+      />
+    );
+  }
   if (!b.content) return null;
   return <p className="t-body" style={{margin: "8px 0", paddingLeft: indent}}>{b.content}</p>;
 }
 
-function ToggleBlock({ b, depth, checks, toggleCheck }) {
+/**
+ * EditableText — contentEditable wrapper that commits on blur only (to avoid caret reset)
+ * and preserves user caret position during editing.
+ */
+function EditableText({ tag = "div", value, onCommit, className, style, placeholder }) {
+  const ref = React.useRef(null);
+  const Tag = tag;
+  // Sync incoming value only when user is not actively editing the node
+  React.useEffect(() => {
+    if (!ref.current) return;
+    if (document.activeElement === ref.current) return;
+    if (ref.current.innerText !== (value || "")) ref.current.innerText = value || "";
+  }, [value]);
+  return (
+    <Tag
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      className={className}
+      style={style}
+      data-placeholder={placeholder || ""}
+      onBlur={(e) => {
+        const next = e.currentTarget.innerText.replace(/\u00A0/g, " ").replace(/\n+$/, "");
+        if (next !== (value || "")) onCommit && onCommit(next);
+      }}
+      onKeyDown={(e) => {
+        // Blur on Enter (single-line blocks) if not Shift+Enter
+        if (e.key === "Enter" && !e.shiftKey && tag !== "p") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+    >{value || ""}</Tag>
+  );
+}
+
+function ToggleBlock({ b, depth, checks, toggleCheck, editBlock }) {
   const [open, setOpen] = uS3(false);
   const indent = depth * 20;
   return (
     <div style={{paddingLeft: indent}}>
-      <div onClick={() => setOpen(!open)} style={{display: "flex", alignItems: "center", gap: 6, padding: "6px 0", cursor: "pointer"}}>
-        <Icon name={open ? "chev-d" : "chev-r"} size={14}/>
-        <span className="t-body" style={{fontWeight: 500}}>{b.content}</span>
+      <div style={{display: "flex", alignItems: "center", gap: 6, padding: "6px 0"}}>
+        <span onClick={() => setOpen(!open)} style={{cursor: "pointer", display: "inline-flex"}}>
+          <Icon name={open ? "chev-d" : "chev-r"} size={14}/>
+        </span>
+        <EditableText
+          tag="span"
+          className="t-body"
+          style={{fontWeight: 500, outline: "none", flex: 1}}
+          value={b.content}
+          onCommit={(v) => editBlock && editBlock(b.id, v, "toggle")}
+        />
       </div>
-      {open && b.children && b.children.map((c, i) => <BlockRenderer key={c.id || i} b={c} idx={i} checks={checks} toggleCheck={toggleCheck} depth={depth + 1}/>)}
+      {open && b.children && b.children.map((c, i) => <BlockRenderer key={c.id || i} b={c} idx={i} checks={checks} toggleCheck={toggleCheck} editBlock={editBlock} go={go} depth={depth + 1}/>)}
     </div>
   );
 }
@@ -288,17 +396,34 @@ function PageScreen({ go, goBack, ctx }) {
   const [loading, setLoading] = uS3(true);
   const [saving, setSaving] = uS3(false);
   const [checks, setChecks] = uS3({});
+  const [moreOpen, setMoreOpen] = uS3(false);
+  const [composer, setComposer] = uS3("");
+  const [addingBlock, setAddingBlock] = uS3(false);
 
   const pageId = ctx?.id;
 
   const fetchPage = React.useCallback(() => {
     if (!pageId) return;
+    const pageUrl = `/api/pages/${pageId}`;
+    const blocksUrl = `/api/pages/${pageId}/blocks`;
     Promise.all([
-      fetch(`/api/pages/${pageId}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`/api/pages/${pageId}/blocks`).then(r => r.ok ? r.json() : null).catch(() => null),
+      window.nmFetch(pageUrl).then(j => j || null),
+      window.nmFetch(blocksUrl).then(j => j || null),
     ]).then(([pageRes, blocksRes]) => {
       // /api/pages/[id] returns flat shape: {id, title, cover, icon, properties, ...}
       setPage(pageRes || null);
+      if (pageRes?.id) {
+        const cat =
+          pageRes.properties?.category ||
+          pageRes.properties?.status ||
+          (pageRes.parentDbId ? "페이지" : "페이지");
+        window.nmTrackRecentPage && window.nmTrackRecentPage({
+          id: pageRes.id,
+          title: pageRes.title,
+          sub: cat,
+          icon: pageRes.iconType === "emoji" ? pageRes.icon : "📄",
+        });
+      }
       // /api/pages/[id]/blocks returns {data: [...]} or [...]
       const bs = blocksRes?.data || blocksRes || [];
       setBlocks(Array.isArray(bs) ? bs : []);
@@ -311,7 +436,7 @@ function PageScreen({ go, goBack, ctx }) {
   }, [pageId]);
   uE3(() => {
     if (!pageId) { setLoading(false); return; }
-    setLoading(true);
+    if (!window.__nmCache?.has(`/api/pages/${pageId}`)) setLoading(true);
     fetchPage();
     const onVis = () => { if (!document.hidden) fetchPage(); };
     document.addEventListener("visibilitychange", onVis);
@@ -329,16 +454,110 @@ function PageScreen({ go, goBack, ctx }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ blockId, checked: next }),
       });
+      window.nmInvalidate && window.nmInvalidate(`/api/pages/${pageId}/blocks`);
     } catch (e) {
       setChecks({ ...checks, [blockId]: !next });
     }
+  };
+
+  // Update a block's text content. Walks the tree (incl. children) to patch
+  // optimistically, then persists to Notion; rolls back on failure.
+  const editBlock = async (blockId, content, blockType) => {
+    const prev = blocks;
+    const patchTree = (list) => list.map((blk) => {
+      if (blk.id === blockId) return { ...blk, content };
+      if (Array.isArray(blk.children)) return { ...blk, children: patchTree(blk.children) };
+      return blk;
+    });
+    setBlocks(patchTree(blocks));
+    try {
+      const r = await fetch(`/api/pages/${pageId}/blocks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blockId, content, blockType }),
+      });
+      if (!r.ok) throw new Error(`PATCH failed ${r.status}`);
+      window.nmInvalidate && window.nmInvalidate(`/api/pages/${pageId}/blocks`);
+    } catch (e) {
+      console.warn("[editBlock rollback]", e);
+      setBlocks(prev);
+    }
+  };
+
+  const invalidatePageLists = () => {
+    ["/api/tasks", "/api/works", "/api/insights", "/api/finance", "/api/reflection"].forEach(k => {
+      window.nmInvalidate && window.nmInvalidate(k);
+    });
   };
 
   const patch = (body) => fetch(`/api/pages/${pageId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  }).then((r) => {
+    if (r.ok) {
+      window.nmInvalidate && window.nmInvalidate(`/api/pages/${pageId}`);
+      invalidatePageLists();
+    }
+    return r;
   });
+
+  const blockFromComposer = (raw) => {
+    const text = (raw || "").trim();
+    const rich = (content) => [{ type: "text", text: { content } }];
+    if (!text) return null;
+    const commands = [
+      ["/h1 ", "heading_1"],
+      ["/h2 ", "heading_2"],
+      ["/h3 ", "heading_3"],
+      ["/todo ", "to_do"],
+      ["/check ", "to_do"],
+      ["/bullet ", "bulleted_list_item"],
+      ["/bul ", "bulleted_list_item"],
+      ["/num ", "numbered_list_item"],
+      ["/quote ", "quote"],
+      ["/callout ", "callout"],
+    ];
+    let type = "paragraph";
+    let content = text;
+    commands.forEach(([prefix, nextType]) => {
+      if (content.toLowerCase().startsWith(prefix)) {
+        type = nextType;
+        content = content.slice(prefix.length).trim();
+      }
+    });
+    if (!content && type !== "to_do") return null;
+    if (type === "to_do") return { object: "block", type, [type]: { rich_text: rich(content || "새 할 일"), checked: false } };
+    return { object: "block", type, [type]: { rich_text: rich(content) } };
+  };
+
+  const appendComposerBlock = async () => {
+    if (!pageId || addingBlock) return;
+    const block = blockFromComposer(composer);
+    if (!block) return;
+    setAddingBlock(true);
+    const tempId = `temp-${Date.now()}`;
+    const tempType = block.type;
+    const tempContent = block[tempType]?.rich_text?.map(t => t.text?.content || "").join("") || "";
+    setBlocks(curr => [...curr, { id: tempId, type: tempType, content: tempContent, checked: false }]);
+    setComposer("");
+    try {
+      const r = await fetch(`/api/pages/${pageId}/blocks`, {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ blocks: [block] }),
+      });
+      if (!r.ok) throw new Error(`append failed ${r.status}`);
+      window.nmInvalidate && window.nmInvalidate(`/api/pages/${pageId}/blocks`);
+      setTimeout(fetchPage, 150);
+    } catch (e) {
+      setBlocks(curr => curr.filter(b => b.id !== tempId));
+      setComposer(tempContent);
+      window.nmToast && window.nmToast("블록 추가 실패");
+    } finally {
+      setAddingBlock(false);
+    }
+  };
 
   const handleToggleCompleted = async () => {
     if (!pageId || !page) return;
@@ -385,6 +604,12 @@ function PageScreen({ go, goBack, ctx }) {
   const handleSaveTitle = async (newTitle) => {
     if (!pageId || !page || !newTitle.trim()) return;
     setPage({...page, title: newTitle});
+    window.nmTrackRecentPage && window.nmTrackRecentPage({
+      id: pageId,
+      title: newTitle,
+      sub: page.properties?.category || page.properties?.status || "페이지",
+      icon: page.iconType === "emoji" ? page.icon : "📄",
+    });
     try {
       await patch({ title: newTitle });
     } catch (e) {}
@@ -395,6 +620,39 @@ function PageScreen({ go, goBack, ctx }) {
   const iconType = page?.iconType || null;
   const cover = page?.cover || null; // null → no cover block
   const props = page?.properties || {};
+  const originalUrl = page?.notionUrl || (pageId ? `https://notion.so/${String(pageId).replace(/-/g, "")}` : "");
+
+  const refreshPage = () => {
+    window.nmInvalidate && window.nmInvalidate(`/api/pages/${pageId}`);
+    setLoading(true);
+    fetchPage();
+    setMoreOpen(false);
+    window.nmToast && window.nmToast("새로고침 중");
+  };
+  const copyPageLink = async () => {
+    const ok = await window.nmCopyText(originalUrl);
+    window.nmToast && window.nmToast(ok ? "링크 복사됨" : "복사 권한 필요");
+    setMoreOpen(false);
+  };
+  const archivePage = async () => {
+    if (!pageId) return;
+    if (!confirm("이 페이지를 Notion에서 아카이브할까요?")) return;
+    try {
+      const r = await fetch(`/api/pages/${pageId}`, {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({archived: true}),
+      });
+      if (!r.ok) throw new Error(`archive failed ${r.status}`);
+      ["/api/tasks", "/api/works", "/api/insights", "/api/finance", "/api/reflection", `/api/pages/${pageId}`, `/api/pages/${pageId}/blocks`].forEach(k => window.nmInvalidate && window.nmInvalidate(k));
+      window.nmRemoveRecentPage && window.nmRemoveRecentPage(pageId);
+      window.nmToast && window.nmToast("아카이브됨");
+      setMoreOpen(false);
+      goBack ? goBack() : go("home");
+    } catch (e) {
+      window.nmToast && window.nmToast("아카이브 실패");
+    }
+  };
 
   // Build property rows dynamically — clickable to edit
   const propRows = [];
@@ -460,7 +718,7 @@ function PageScreen({ go, goBack, ctx }) {
         </div>
         <div style={{display: "flex", alignItems: "center", gap: 4}}>
           {page?.notionUrl && <NavIconBtn icon="share" onClick={() => window.open(page.notionUrl, "_blank")}/>}
-          <NavIconBtn icon="more"/>
+          <NavIconBtn icon="more" onClick={() => setMoreOpen(true)}/>
         </div>
       </div>
 
@@ -542,7 +800,7 @@ function PageScreen({ go, goBack, ctx }) {
           ) : blocks.length === 0 ? (
             <div className="t-footnote muted">이 페이지에 블록이 없어요.</div>
           ) : (
-            blocks.map((b, i) => <BlockRenderer key={b.id || i} b={b} idx={i} checks={checks} toggleCheck={toggleCheck}/>)
+            blocks.map((b, i) => <BlockRenderer key={b.id || i} b={b} idx={i} checks={checks} toggleCheck={toggleCheck} editBlock={editBlock} go={go}/>)
           )}
           <div style={{height: 40}}/>
         </div>
@@ -551,19 +809,49 @@ function PageScreen({ go, goBack, ctx }) {
       </div>
 
       {/* Floating glass composer pill — block menu entry */}
-      <div style={{position: "absolute", bottom: 94, left: 16, right: 16, zIndex: 30}}>
+      <div style={{position: "absolute", bottom: "calc(var(--nm-tabbar-space, 100px) - 6px)", left: 16, right: 16, zIndex: 30}}>
         <div className="glass" style={{borderRadius: 20, padding: "10px 12px", display: "flex", alignItems: "center", gap: 8}}>
-          <button style={{width: 32, height: 32, border: "none", background: "var(--n-surface-hover)", borderRadius: 16, display: "grid", placeItems: "center", cursor: "pointer"}}>
+          <button
+            onClick={appendComposerBlock}
+            disabled={!composer.trim() || addingBlock}
+            style={{width: 32, height: 32, border: "none", background: "var(--n-surface-hover)", borderRadius: 16, display: "grid", placeItems: "center", cursor: composer.trim() ? "pointer" : "default", opacity: composer.trim() ? 1 : 0.55}}>
             <Icon name="plus" size={18}/>
           </button>
-          <input className="input" placeholder="블록 추가, / 로 명령" style={{flex: 1, background: "transparent", padding: "6px 0"}}/>
-          <button style={{width: 32, height: 32, border: "none", background: "transparent", borderRadius: 16, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--n-text-muted)"}}>
+          <input
+            className="input"
+            placeholder="블록 추가, / 로 명령"
+            value={composer}
+            onChange={(e) => setComposer(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                appendComposerBlock();
+              }
+            }}
+            style={{flex: 1, background: "transparent", padding: "6px 0"}}
+          />
+          <button
+            onClick={() => setComposer(c => c.trim().startsWith("/") ? c : `/todo ${c}`)}
+            style={{width: 32, height: 32, border: "none", background: "transparent", borderRadius: 16, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--n-text-muted)"}}>
             <Icon name="sparkle" size={18}/>
           </button>
         </div>
       </div>
 
-      <TabBar active={0} onChange={i => { if (i === 0) go("home"); else if (i === 1) go("search"); else if (i === 2) go("event-edit"); else if (i === 3) go("inbox"); else if (i === 4) go("settings"); }}/>
+      <TabBar active={0} onChange={i => {
+        if (i === 0) go("home");
+        else if (i === 1) go("search");
+        else if (i === 2) go("event-edit", page?.parentDbId ? { dbId: page.parentDbId, subTitle: "현재 DB" } : {});
+        else if (i === 3) go("inbox");
+        else if (i === 4) go("settings");
+      }}/>
+
+      <ActionSheet open={moreOpen} title="페이지" subtitle={title} onClose={() => setMoreOpen(false)}>
+        <ActionRow icon="share" title="Notion에서 열기" subtitle="원본 페이지 열기" onClick={() => { window.open(originalUrl, "_blank"); setMoreOpen(false); }}/>
+        <ActionRow icon="link" title="링크 복사" subtitle="Notion URL 복사" onClick={copyPageLink}/>
+        <ActionRow icon="sync" title="새로고침" subtitle="페이지와 블록 다시 불러오기" onClick={refreshPage}/>
+        <ActionRow icon="archive" title="아카이브" subtitle="Notion에서 페이지 숨기기" tone="danger" onClick={archivePage}/>
+      </ActionSheet>
     </>
   );
 }
@@ -576,15 +864,23 @@ const DB_ID_BY_KEY = {
   finance:    "28f003c7-f7be-8080-85b4-d73efe3cb896",
   reflection: "31e003c7-f7be-80a0-ab4f-c1e2249f3c24",
 };
+function coreDbId3(key) {
+  const mapped = window.nmCoreDbId?.(key);
+  if (mapped) return mapped;
+  if (window.nmConnectionMode?.() === "owner") return DB_ID_BY_KEY[key] || DB_ID_BY_KEY.tasks;
+  return null;
+}
 const DB_LABEL = {
   tasks: "태스크", works: "웍스", insights: "인사이트", finance: "가계부", reflection: "스크립트",
 };
 
 function EventEditScreen({ go, goBack, ctx }) {
-  const dbKey = ctx?.dbKey || "tasks";
+  const dbKey = ctx?.dbKey || (ctx?.dbId ? "custom" : "tasks");
   const subDbId = ctx?.dbId;
-  const targetDbId = subDbId || DB_ID_BY_KEY[dbKey] || DB_ID_BY_KEY.tasks;
-  const dbLabel = DB_LABEL[dbKey] || "태스크";
+  const targetDbId = subDbId || coreDbId3(dbKey);
+  const dbLabel = ctx?.subTitle || DB_LABEL[dbKey] || "페이지";
+  const isFinance = dbKey === "finance";
+  const isTask = dbKey === "tasks";
   const suggestionsByDb = {
     tasks: ["내일 10시 디자인 리뷰", "금요일 오후 2시 고객 미팅", "다음주 월요일 스탠드업"],
     works: ["새 프로젝트", "리서치", "아이디어"],
@@ -595,27 +891,101 @@ function EventEditScreen({ go, goBack, ctx }) {
   const suggestions = suggestionsByDb[dbKey] || suggestionsByDb.tasks;
 
   const [title, setTitle] = uS3("");
-  const [allDay, setAllDay] = uS3(false);
+  const [allDay, setAllDay] = uS3(true);
   const [saving, setSaving] = uS3(false);
   const [saveError, setSaveError] = uS3(null);
+  const nowParts = (() => {
+    const d = new Date();
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return { date, time };
+  })();
+  const todayIso = nowParts.date;
+  // Tasks flow — optional date + time (e.g. from calendar "+" with ctx.date)
+  const [taskDate, setTaskDate] = uS3(() => ctx?.date || nowParts.date);
+  const [taskTime, setTaskTime] = uS3(() => ctx?.date ? "" : nowParts.time); // "HH:MM"
+  // Finance-specific state
+  const [financeType, setFinanceType] = uS3("지출");
+  const [financeAmount, setFinanceAmount] = uS3(""); // string so we can show empty
+  const [financeDate, setFinanceDate] = uS3(() => ctx?.date || todayIso);
+  const [financeMemo, setFinanceMemo] = uS3("");
+  const invalidateCreatedDb = () => {
+    if (subDbId) window.nmInvalidate && window.nmInvalidate(`/api/database-pages?dbId=${subDbId}`);
+    const url = window.nmCoreEndpoint?.(dbKey);
+    if (url) window.nmInvalidate && window.nmInvalidate(url);
+    if (dbKey) window.nmInvalidate && window.nmInvalidate(`/api/${dbKey}`);
+    window.nmInvalidate && window.nmInvalidate("/api/databases");
+  };
 
   const handleSave = async () => {
-    if (!title.trim() || saving) return;
+    if (saving) return;
+    if (!targetDbId) {
+      setSaveError(window.NM_EMPTY_DB_MESSAGE || "노션에서 데이터베이스를 추가해주세요");
+      return;
+    }
+    if (isFinance) {
+      const amt = Number(financeAmount);
+      if (!title.trim() || !amt || amt <= 0 || !financeType) return;
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const res = await fetch("/api/finance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            type: financeType,
+            amount: amt,
+            date: financeDate || undefined,
+            memo: financeMemo || undefined,
+            dbId: targetDbId,
+          }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || `HTTP ${res.status}`);
+        }
+        invalidateCreatedDb();
+        goBack ? goBack() : go("home");
+      } catch (e) {
+        setSaveError(e.message || "저장 실패");
+        setSaving(false);
+      }
+      return;
+    }
+    if (!title.trim()) return;
     setSaving(true);
     setSaveError(null);
     try {
+      // Build optional Date property. /api/pages also auto-discovers date property
+      // names, but this keeps the common Beyond_Tasks path explicit.
+      const extraProps = {};
+      if (taskDate) {
+        const start = taskTime ? `${taskDate}T${taskTime}:00` : taskDate;
+        extraProps["Date"] = { date: { start } };
+        extraProps.__defaultDate = start;
+      }
       const res = await fetch("/api/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dbId: targetDbId, title: title.trim() }),
+        body: JSON.stringify({
+          dbId: targetDbId,
+          title: title.trim(),
+          properties: Object.keys(extraProps).length ? extraProps : undefined,
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      invalidateCreatedDb();
       goBack ? goBack() : go("home");
     } catch (e) {
       setSaveError(e.message || "저장 실패");
       setSaving(false);
     }
   };
+
+  const canSave = isFinance
+    ? (title.trim() && Number(financeAmount) > 0 && financeType)
+    : !!title.trim();
   return (
     <>
       {/* Dim backdrop */}
@@ -625,11 +995,17 @@ function EventEditScreen({ go, goBack, ctx }) {
 
       {/* Sheet */}
       <div style={{
-        position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 21,
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: "var(--nm-keyboard-bottom, 0px)",
+        zIndex: 21,
         background: "var(--n-bg-grouped)",
         borderTopLeftRadius: 26, borderTopRightRadius: 26,
-        maxHeight: "88%", display: "flex", flexDirection: "column",
+        maxHeight: "calc(88dvh - var(--safe-t, 0px) - var(--nm-keyboard-bottom, 0px))",
+        display: "flex", flexDirection: "column",
         boxShadow: "0 -20px 40px rgba(0,0,0,0.15)",
+        paddingBottom: "calc(var(--safe-b, env(safe-area-inset-bottom, 0px)) + 8px)",
       }}>
         {/* Grabber */}
         <div style={{display: "grid", placeItems: "center", padding: "8px 0 4px"}}>
@@ -639,10 +1015,15 @@ function EventEditScreen({ go, goBack, ctx }) {
         <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 16px 8px"}}>
           <button className="btn btn--ghost btn--sm" onClick={() => goBack ? goBack() : go("home")} style={{padding: "6px 4px"}}>취소</button>
           <div className="t-headline">{saveError ? "저장 실패" : saving ? "저장 중..." : `새 ${dbLabel}`}</div>
-          <button className="btn btn--sm btn--primary" onClick={handleSave} disabled={!title.trim() || saving} style={{padding: "6px 14px", opacity: (!title.trim() || saving) ? 0.4 : 1}}>{saving ? "저장중" : "저장"}</button>
+          <button className="btn btn--sm btn--primary" onClick={handleSave} disabled={!canSave || saving} style={{padding: "6px 14px", opacity: (!canSave || saving) ? 0.4 : 1}}>{saving ? "저장중" : "저장"}</button>
         </div>
+        {saveError && (
+          <div className="t-footnote" style={{margin: "0 20px 8px", padding: "9px 12px", borderRadius: 10, color: "#A5483D", background: "#FDEBEC"}}>
+            {saveError}
+          </div>
+        )}
 
-        <div style={{flex: 1, overflowY: "auto", paddingBottom: 16}}>
+        <div style={{flex: 1, overflowY: "auto", paddingBottom: "calc(24px + var(--safe-b, env(safe-area-inset-bottom, 0px)))"}}>
           {/* Quick capture */}
           <div style={{padding: "8px 20px 16px"}}>
             <div style={{
@@ -650,9 +1031,9 @@ function EventEditScreen({ go, goBack, ctx }) {
               background: "var(--n-surface)", borderRadius: 14, padding: "14px 14px",
               boxShadow: "var(--sh-1)",
             }}>
-              <Icon name="sparkle" size={18} color="#9065B0"/>
+              <Icon name="sparkle" size={18} color={isFinance ? "#D44C47" : "#9065B0"}/>
               <input autoFocus value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="내일 10시 디자인 리뷰..."
+                placeholder={isFinance ? "카페, 점심, 교통 등 항목" : "내일 10시 디자인 리뷰..."}
                 style={{flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 17, color: "var(--n-text)", font: "inherit"}}/>
               <button style={{border: "none", background: "var(--n-surface-hover)", borderRadius: 18, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer"}}>
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2v10M4 7l5-5 5 5M3 15h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -670,57 +1051,154 @@ function EventEditScreen({ go, goBack, ctx }) {
             </div>
           </div>
 
-          {/* Form fields (grouped list) */}
-          <div className="g-list">
-            <div className="g-row">
-              <Icon name="clock" size={18} color="var(--n-text-muted)"/>
-              <div style={{flex: 1}} className="t-body">하루 종일</div>
-              <Toggle on={allDay} onChange={setAllDay}/>
-            </div>
-            <div className="g-row">
-              <div style={{width: 18}}/>
-              <div style={{flex: 1}} className="t-body">시작</div>
-              <div className="t-body" style={{color: "var(--n-text-muted)"}}>4월 23일 (목) 10:00</div>
-            </div>
-            <div className="g-row">
-              <div style={{width: 18}}/>
-              <div style={{flex: 1}} className="t-body">종료</div>
-              <div className="t-body" style={{color: "var(--n-text-muted)"}}>4월 23일 (목) 11:00</div>
-            </div>
-          </div>
-
-          <div className="g-list" style={{marginTop: 16}}>
-            <div className="g-row">
-              <Icon name="location" size={18} color="var(--n-text-muted)"/>
-              <div style={{flex: 1}} className="t-body">장소 추가</div>
-            </div>
-            <div className="g-row">
-              <Icon name="person" size={18} color="var(--n-text-muted)"/>
-              <div style={{flex: 1}} className="t-body">참여자</div>
-              <Assignees names={["H","K","J"]} size={22}/>
-            </div>
-            <div className="g-row">
-              <Icon name="bell" size={18} color="var(--n-text-muted)"/>
-              <div style={{flex: 1}} className="t-body">알림</div>
-              <div className="t-body" style={{color: "var(--n-text-muted)"}}>10분 전</div>
-            </div>
-            <div className="g-row">
-              <Icon name="tag" size={18} color="var(--n-text-muted)"/>
-              <div style={{flex: 1}} className="t-body">캘린더 DB</div>
-              <div style={{display: "flex", alignItems: "center", gap: 6}}>
-                <div className="icon-tile" style={{width: 22, height: 22, background: "#DDEBF1", color: "#337EA9"}}>📅</div>
-                <div className="t-body">캘린더</div>
+          {isFinance ? (
+            <>
+              {/* 수입/지출 type segmented */}
+              <div className="g-list">
+                <div className="g-row" style={{flexDirection: "column", alignItems: "stretch", gap: 8, padding: "14px 16px"}}>
+                  <div className="t-caption" style={{color: "var(--n-text-muted)", letterSpacing: "-0.2px"}}>유형</div>
+                  <div style={{display: "flex", gap: 6, padding: 3, background: "var(--n-surface-hover)", borderRadius: 10}}>
+                    {["수입", "지출"].map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setFinanceType(t)}
+                        data-fin-type={t}
+                        style={{
+                          flex: 1, padding: "8px 12px", border: "none", borderRadius: 8,
+                          background: financeType === t ? "var(--n-surface)" : "transparent",
+                          color: financeType === t
+                            ? (t === "수입" ? "#448361" : "#D44C47")
+                            : "var(--n-text-muted)",
+                          fontWeight: financeType === t ? 600 : 500,
+                          fontSize: 14, cursor: "pointer",
+                          boxShadow: financeType === t ? "var(--sh-1)" : "none",
+                          transition: "all 140ms ease",
+                        }}>{t}</button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="g-list" style={{marginTop: 16}}>
-            <div className="g-row" style={{alignItems: "flex-start", padding: "12px 16px"}}>
-              <Icon name="menu" size={18} color="var(--n-text-muted)" style={{marginTop: 2}}/>
-              <textarea placeholder="메모 및 설명..." rows={3}
-                style={{flex: 1, border: "none", outline: "none", background: "transparent", resize: "none", font: "inherit", fontSize: 17, color: "var(--n-text)"}}/>
-            </div>
-          </div>
+              {/* Amount / Date */}
+              <div className="g-list" style={{marginTop: 12}}>
+                <div className="g-row" style={{alignItems: "center"}}>
+                  <Icon name="tag" size={18} color="var(--n-text-muted)"/>
+                  <div style={{flex: 1}} className="t-body">금액</div>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    data-fin-amount
+                    value={financeAmount}
+                    onChange={e => setFinanceAmount(e.target.value)}
+                    placeholder="0"
+                    style={{
+                      width: 140, border: "none", outline: "none", background: "transparent",
+                      textAlign: "right", fontSize: 17, color: "var(--n-text)",
+                      fontWeight: 600, fontVariantNumeric: "tabular-nums",
+                    }}/>
+                  <span className="t-body" style={{color: "var(--n-text-muted)", marginLeft: 4}}>원</span>
+                </div>
+                <div className="g-row" style={{alignItems: "center"}}>
+                  <Icon name="calendar" size={18} color="var(--n-text-muted)"/>
+                  <div style={{flex: 1}} className="t-body">날짜</div>
+                  <input
+                    type="date"
+                    data-fin-date
+                    value={financeDate}
+                    onChange={e => setFinanceDate(e.target.value)}
+                    style={{
+                      border: "none", outline: "none", background: "transparent",
+                      fontSize: 15, color: "var(--n-text-muted)", font: "inherit",
+                    }}/>
+                </div>
+              </div>
+
+              {/* Memo */}
+              <div className="g-list" style={{marginTop: 12}}>
+                <div className="g-row" style={{alignItems: "flex-start", padding: "12px 16px"}}>
+                  <Icon name="menu" size={18} color="var(--n-text-muted)" style={{marginTop: 2}}/>
+                  <textarea
+                    placeholder="메모 (선택)"
+                    rows={2}
+                    data-fin-memo
+                    value={financeMemo}
+                    onChange={e => setFinanceMemo(e.target.value)}
+                    style={{flex: 1, border: "none", outline: "none", background: "transparent", resize: "none", font: "inherit", fontSize: 16, color: "var(--n-text)"}}/>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Form fields (grouped list) */}
+              <div className="g-list">
+                <div className="g-row">
+                  <Icon name="clock" size={18} color="var(--n-text-muted)"/>
+                  <div style={{flex: 1}} className="t-body">하루 종일</div>
+                  <Toggle on={allDay} onChange={(v) => {
+                    setAllDay(v);
+                    if (v) setTaskTime("");
+                    else if (!taskTime) setTaskTime(nowParts.time);
+                  }}/>
+                </div>
+                <div className="g-row" style={{alignItems: "center"}}>
+                  <Icon name="calendar" size={18} color="var(--n-text-muted)"/>
+                  <div style={{flex: 1}} className="t-body">날짜</div>
+                  <input
+                    type="date"
+                    data-task-date
+                    value={taskDate}
+                    onChange={e => setTaskDate(e.target.value)}
+                    style={{border: "none", outline: "none", background: "transparent", fontSize: 15, color: "var(--n-text-muted)", font: "inherit"}}/>
+                </div>
+                {!allDay && (
+                  <div className="g-row" style={{alignItems: "center"}}>
+                    <div style={{width: 18}}/>
+                    <div style={{flex: 1}} className="t-body">시간</div>
+                    <input
+                      type="time"
+                      data-task-time
+                      value={taskTime}
+                      onChange={e => setTaskTime(e.target.value)}
+                      style={{border: "none", outline: "none", background: "transparent", fontSize: 15, color: "var(--n-text-muted)", font: "inherit"}}/>
+                  </div>
+                )}
+              </div>
+
+              <div className="g-list" style={{marginTop: 16}}>
+                <div className="g-row">
+                  <Icon name="location" size={18} color="var(--n-text-muted)"/>
+                  <div style={{flex: 1}} className="t-body">장소 추가</div>
+                </div>
+                <div className="g-row">
+                  <Icon name="person" size={18} color="var(--n-text-muted)"/>
+                  <div style={{flex: 1}} className="t-body">참여자</div>
+                  <Assignees names={["H","K","J"]} size={22}/>
+                </div>
+                <div className="g-row">
+                  <Icon name="bell" size={18} color="var(--n-text-muted)"/>
+                  <div style={{flex: 1}} className="t-body">알림</div>
+                  <div className="t-body" style={{color: "var(--n-text-muted)"}}>10분 전</div>
+                </div>
+                <div className="g-row">
+                  <Icon name="tag" size={18} color="var(--n-text-muted)"/>
+                  <div style={{flex: 1}} className="t-body">캘린더 DB</div>
+                  <div style={{display: "flex", alignItems: "center", gap: 6}}>
+                    <div className="icon-tile" style={{width: 22, height: 22, background: "#DDEBF1", color: "#337EA9"}}>📅</div>
+                    <div className="t-body">캘린더</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="g-list" style={{marginTop: 16}}>
+                <div className="g-row" style={{alignItems: "flex-start", padding: "12px 16px"}}>
+                  <Icon name="menu" size={18} color="var(--n-text-muted)" style={{marginTop: 2}}/>
+                  <textarea placeholder="메모 및 설명..." rows={3}
+                    style={{flex: 1, border: "none", outline: "none", background: "transparent", resize: "none", font: "inherit", fontSize: 17, color: "var(--n-text)"}}/>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>
@@ -730,6 +1208,7 @@ function EventEditScreen({ go, goBack, ctx }) {
 /* ── Settings ──────────────────────────────────────── */
 function SettingsScreen({ go, goBack, dark, setDark }) {
   const [connected, setConnected] = uS3(null);
+  const [connectionMode, setConnectionMode] = uS3(() => window.nmConnectionMode?.() || "demo");
   const [profileName] = uS3(() => localStorage.getItem("nm-profile-name") || "효율");
   const [profileWorkspace] = uS3(() => localStorage.getItem("nm-profile-workspace") || "Beyondworks");
   const [profilePlan] = uS3(() => localStorage.getItem("nm-profile-plan") || "Pro");
@@ -740,9 +1219,14 @@ function SettingsScreen({ go, goBack, dark, setDark }) {
   const [cacheSize, setCacheSize] = uS3("—");
 
   uE3(() => {
-    fetch("/api/tasks")
-      .then(r => r.ok ? r.json() : { mock: true })
-      .then(j => setConnected(!j.mock))
+    window.nmRefreshSession?.().then(s => {
+      if (s?.connected) {
+        setConnectionMode("oauth");
+        setConnected(true);
+      }
+    });
+    window.nmFetch(window.nmCoreEndpoint?.("tasks") || "/api/tasks")
+      .then(() => setConnected((window.nmConnectionMode?.() || "demo") !== "demo"))
       .catch(() => setConnected(false));
     // Estimate cache
     if (navigator.storage?.estimate) {
@@ -811,6 +1295,13 @@ function SettingsScreen({ go, goBack, dark, setDark }) {
     alert("캐시를 비웠습니다.");
     setCacheSize("0 MB");
   };
+  const logoutNotion = async () => {
+    if (!confirm("Notion 연결을 해제하고 데모 모드로 전환할까요?")) return;
+    await window.nmLogoutNotion?.();
+    setConnectionMode("demo");
+    setConnected(false);
+    go("token");
+  };
   const statusText = connected === null ? "확인 중..." : connected ? "연결됨 · 실시간 동기화" : "Demo 모드 · 토큰 필요";
   const statusBg = connected ? "#DDEDEA" : "#FDEBEC";
   const statusFg = connected ? "#448361" : "#D44C47";
@@ -854,6 +1345,15 @@ function SettingsScreen({ go, goBack, dark, setDark }) {
             </div>
             <div className="chev"/>
           </div>
+          {connectionMode === "oauth" && (
+            <div className="g-row g-row--with-icon g-row--tap" onClick={logoutNotion} style={{cursor: "pointer"}}>
+              <div className="icon-tile" style={{background: "#FDEBEC", color: "#D44C47"}}>×</div>
+              <div style={{flex: 1}}>
+                <div className="t-body">Notion 로그아웃</div>
+                <div className="t-footnote">OAuth 세션과 DB 매핑 제거</div>
+              </div>
+            </div>
+          )}
           <div className="g-row g-row--with-icon">
             <div className="icon-tile">🔔</div>
             <div style={{flex: 1}}><div className="t-body">알림</div></div>
@@ -897,7 +1397,7 @@ function SettingsScreen({ go, goBack, dark, setDark }) {
         </div>
 
         <div style={{padding: "24px 20px", textAlign: "center"}}>
-          <div className="t-footnote">Notion Mobile v0.1 · Artiwave</div>
+          <div className="t-footnote">Nolio v0.1 · Artiwave</div>
         </div>
 
         <TabSpacer/>

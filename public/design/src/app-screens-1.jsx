@@ -26,56 +26,157 @@ function OnboardingScreen({ go, goBack }) {
         if (step < steps.length - 1) setStep(step + 1);
         else go("token");
       }}>{step < steps.length - 1 ? "계속" : "Notion 연결하기"}</button>
-      <button className="btn btn--ghost" style={{marginTop: 8, width: "100%"}} onClick={() => go("home")}>둘러보기</button>
+      <button className="btn btn--ghost" style={{marginTop: 8, width: "100%"}} onClick={() => {
+        window.nmSetConnection && window.nmSetConnection("demo");
+        go("home");
+      }}>둘러보기</button>
     </div>
   );
 }
 
 function TokenScreen({ go, goBack }) {
   const [val, setVal] = uS1("");
+  const [connecting, setConnecting] = uS1(false);
+  const [error, setError] = uS1("");
+  const [profile, setProfile] = uS1(null);
+  const [connected, setConnected] = uS1(false);
+  const [oauthConfigured, setOauthConfigured] = uS1(() => localStorage.getItem("nm-oauth-configured") === "1");
+
+  uE1(() => {
+    const storedMode = localStorage.getItem("nm-connection-mode");
+    const storedName = localStorage.getItem("nm-profile-workspace") || localStorage.getItem("nm-profile-name");
+    if ((storedMode === "custom" || storedMode === "oauth") && storedName) {
+      let mappingCount = 0;
+      try { mappingCount = Object.keys(window.nmLoadCoreDbMap?.() || {}).length; } catch {}
+      setConnected(true);
+      setProfile({ name: storedName, databaseCount: mappingCount });
+    }
+    window.nmRefreshSession?.().then(s => {
+      if (s?.oauthConfigured != null) setOauthConfigured(!!s.oauthConfigured);
+      if (s?.connected) {
+        setConnected(true);
+        setProfile({ name: s.profile?.workspaceName || "Connected Notion", databaseCount: Object.keys(window.nmLoadCoreDbMap?.() || {}).length });
+      }
+    });
+  }, []);
+
+  const connect = async () => {
+    const token = val.trim();
+    if (!token || connecting) return;
+    setConnecting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/notion/session", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ token }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || "Notion 연결에 실패했습니다.");
+      localStorage.setItem("nm-notion-profile", JSON.stringify(json.profile || {}));
+      if (json.profile?.name) localStorage.setItem("nm-profile-name", json.profile.name);
+      localStorage.setItem("nm-profile-workspace", "Connected Notion");
+      window.nmSetConnection && window.nmSetConnection("custom", token);
+      setConnected(true);
+      setProfile(json.profile || null);
+      go("db-picker");
+    } catch (err) {
+      setError(err?.message || "토큰을 확인해주세요.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const continueNext = () => {
+    if (connected && !val.trim()) {
+      go("db-picker");
+      return;
+    }
+    connect();
+  };
+
   return (
     <>
       <NavBar title="API 연결" large={false} left={<NavIconBtn icon="back" onClick={goBack}/>}/>
       <div style={{flex: 1, overflowY: "auto", padding: "0 0 40px"}}>
         <div style={{padding: "0 20px 24px"}}>
-          <div className="t-title-1" style={{marginBottom: 8}}>Integration Token</div>
+          <div className="t-title-1" style={{marginBottom: 8}}>Notion 로그인</div>
           <div className="t-body muted">
-            notion.so/my-integrations 에서 Internal Integration Token을 발급하고 붙여넣어주세요.
+            OAuth로 워크스페이스를 연결하면 토큰을 브라우저에 노출하지 않고 이 앱에서 Notion을 사용할 수 있어요.
           </div>
         </div>
-        <div className="g-header">INTEGRATION TOKEN</div>
+        <div style={{padding: "0 20px 18px"}}>
+          <button
+            className="btn btn--primary"
+            style={{width: "100%"}}
+            disabled={!oauthConfigured}
+            onClick={() => {
+              if (connected) go("db-picker");
+              else window.location.href = "/api/oauth/notion/start";
+            }}
+          >
+            {connected ? "연결된 워크스페이스 계속" : "Notion으로 계속"}
+          </button>
+          {!oauthConfigured && (
+            <div className="t-footnote" style={{marginTop: 10, color: "#A5483D", lineHeight: 1.5}}>
+              OAuth 환경변수가 아직 설정되지 않았습니다. Vercel에 OAuth client id/secret을 넣으면 이 버튼이 활성화됩니다.
+            </div>
+          )}
+        </div>
+
+        <div className="g-header">고급 · INTERNAL INTEGRATION TOKEN</div>
         <div className="g-list">
           <div className="g-row" style={{padding: 16}}>
-            <input className="input" placeholder="secret_xxxxxxxxxxxxxxxx" value={val}
+            <input className="input" placeholder="secret_..." value={val}
               onChange={e => setVal(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") connect(); }}
               style={{background: "transparent", padding: 0, fontFamily: "var(--f-mono)", fontSize: 14}}/>
           </div>
         </div>
         <div style={{display: "flex", gap: 8, padding: "12px 20px 0"}}>
-          <button className="btn btn--sm" onClick={() => setVal("secret_aB3kL9mNpQrStUvWxYz2c4D6f8G")}>📋 붙여넣기</button>
-          <button className="btn btn--sm">📷 QR 스캔</button>
-          <button className="btn btn--sm">❓ 도움말</button>
+          <button className="btn btn--sm" onClick={async () => {
+            try {
+              const text = await navigator.clipboard?.readText?.();
+              if (text) setVal(text.trim());
+            } catch {
+              window.nmToast && window.nmToast("클립보드 권한을 확인해주세요.");
+            }
+          }}>붙여넣기</button>
+          <button className="btn btn--sm" onClick={() => window.open("https://www.notion.so/my-integrations", "_blank")}>토큰 만들기</button>
+          <button className="btn btn--sm" onClick={() => {
+            window.nmSetConnection && window.nmSetConnection("demo");
+            go("home");
+          }}>데모 보기</button>
         </div>
 
-        <div className="g-header" style={{marginTop: 24}}>연결된 워크스페이스</div>
+        <div className="g-header" style={{marginTop: 24}}>연결 상태</div>
         <div className="g-list">
           <div className="g-row g-row--with-icon" style={{padding: "14px 16px"}}>
-            <div className="icon-tile icon-tile--lg" style={{background: "#DDEDEA", color: "#448361"}}>✓</div>
+            <div className="icon-tile icon-tile--lg" style={{background: profile ? "#DDEDEA" : "#F1F1EF", color: profile ? "#448361" : "#787774"}}>{profile ? "✓" : "N"}</div>
             <div style={{flex: 1}}>
-              <div className="t-headline">효율's workspace</div>
-              <div className="t-footnote">12 pages · 4 databases 감지됨</div>
+              <div className="t-headline">{profile?.name || "아직 연결되지 않음"}</div>
+              <div className="t-footnote">{profile ? `${profile.databaseCount || 0}개 매핑됨 · 다음으로 DB를 선택하세요` : "토큰 검증 후 DB 선택으로 이동합니다"}</div>
             </div>
           </div>
         </div>
+        {error && (
+          <div style={{padding: "12px 20px 0"}}>
+            <div className="t-footnote" style={{background: "#FDEBEC", color: "#A5483D", padding: 12, borderRadius: 10, lineHeight: 1.5}}>
+              {error}
+            </div>
+          </div>
+        )}
 
         <div style={{padding: "20px", marginTop: 8}}>
           <div className="t-footnote" style={{background: "var(--n-surface-hover)", padding: 12, borderRadius: 10, lineHeight: 1.5}}>
-            🔒 토큰은 <b>기기 키체인</b>에만 저장되며 외부로 전송되지 않아요.
+            OAuth 세션은 서버 전용 쿠키에 저장됩니다. 고급 토큰 방식은 이 브라우저에 토큰이 저장되므로 개인 테스트용으로만 쓰는 것을 권장합니다.
           </div>
         </div>
       </div>
       <div style={{padding: "12px 20px 28px", background: "var(--n-bg-grouped)"}}>
-        <button className="btn btn--primary" style={{width: "100%"}} onClick={() => go("db-picker")} disabled={!val}>다음 · DB 선택</button>
+        <button className="btn btn--primary" style={{width: "100%"}} onClick={continueNext} disabled={(!connected && !val.trim()) || connecting}>
+          {connecting ? "연결 확인 중..." : connected && !val.trim() ? "다음 · DB 선택" : "연결하고 DB 선택"}
+        </button>
       </div>
     </>
   );
@@ -84,14 +185,6 @@ function TokenScreen({ go, goBack }) {
 function DbPickerScreen({ go, goBack }) {
   const [dbs, setDbs] = uS1([]);
   const [loading, setLoading] = uS1(true);
-  const CORE_DB_ID_MAP = {
-    tasks:      "242003c7-f7be-804a-9d6e-f76d5d0347b4",
-    calendar:   "242003c7-f7be-804a-9d6e-f76d5d0347b4",
-    works:      "241003c7-f7be-8011-8ba4-cecf131df2a0",
-    insights:   "241003c7-f7be-800b-b71c-df3acddc5bb8",
-    finance:    "28f003c7-f7be-8080-85b4-d73efe3cb896",
-    reflection: "31e003c7-f7be-80a0-ab4f-c1e2249f3c24",
-  };
   // Map DB id → home-section labels so picker shows which DBs are aliased on home
   const DB_TO_HOME_LABEL = {
     "242003c7-f7be-804a-9d6e-f76d5d0347b4": "홈: 태스크 · 캘린더",
@@ -106,23 +199,15 @@ function DbPickerScreen({ go, goBack }) {
       const raw = localStorage.getItem("nm-pinned-dbs");
       (raw ? JSON.parse(raw) : []).forEach(id => ids.add(id));
     } catch {}
-    // Derive from home widgets (core + custom)
-    try {
-      const ws = JSON.parse(localStorage.getItem("nm-home-widgets") || "null") || [];
-      ws.forEach(w => {
-        if (w.dbId) ids.add(w.dbId);
-        if (w.key && CORE_DB_ID_MAP[w.key]) ids.add(CORE_DB_ID_MAP[w.key]);
-      });
-    } catch {}
+    getHomePinnedDbIds().forEach(id => ids.add(id));
     return ids;
   });
   const [query, setQuery] = uS1("");
 
   uE1(() => {
-    fetch("/api/databases")
-      .then(r => r.ok ? r.json() : {data: []})
-      .then(j => {
-        setDbs(j.data || []);
+    loadDbList({ force: true })
+      .then(list => {
+        setDbs(list);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -136,48 +221,11 @@ function DbPickerScreen({ go, goBack }) {
     setPinned(next);
     localStorage.setItem("nm-pinned-dbs", JSON.stringify([...next]));
 
-    // Load current widgets
-    let widgets = [];
-    try { widgets = JSON.parse(localStorage.getItem("nm-home-widgets") || "null") || CORE_WIDGETS; } catch { widgets = CORE_WIDGETS; }
-
-    // Is this one of the core DBs?
-    const coreKeysMatched = Object.entries(CORE_DB_ID_MAP)
-      .filter(([_, dbid]) => dbid === id)
-      .map(([k]) => k);
-
     if (pinning) {
-      if (coreKeysMatched.length) {
-        // Re-add missing core widgets
-        coreKeysMatched.forEach(k => {
-          if (!widgets.find(w => w.key === k)) {
-            const core = CORE_WIDGETS.find(c => c.key === k);
-            if (core) widgets = [...widgets, core];
-          }
-        });
-      } else if (db) {
-        if (!widgets.find(w => w.dbId === db.id)) {
-          const col = colorForDb(db.id);
-          widgets = [...widgets, {
-            key: `db-${db.id}`,
-            dbId: db.id,
-            dbKey: null,
-            n: db.title,
-            c: col.c,
-            fg: col.fg,
-            icon: (db.icon && /^https?:\/\//.test(db.icon)) ? db.icon : (db.icon || "📦"),
-            sub: "",
-            go: "db-list",
-          }];
-        }
-      }
+      addDbToHome(db);
     } else {
-      if (coreKeysMatched.length) {
-        widgets = widgets.filter(w => !coreKeysMatched.includes(w.key));
-      } else {
-        widgets = widgets.filter(w => w.dbId !== id);
-      }
+      removeDbFromHome(id);
     }
-    localStorage.setItem("nm-home-widgets", JSON.stringify(widgets));
   };
 
   const visible = (query.trim()
@@ -198,9 +246,9 @@ function DbPickerScreen({ go, goBack }) {
         right={<button className="btn btn--sm btn--primary" onClick={() => go("home")} style={{padding: "6px 14px"}}>완료</button>}
       />
       <div style={{flex: 1, overflowY: "auto"}} className="scroll-fade">
-        <div className="t-footnote muted" style={{padding: "4px 20px 12px", background: "var(--n-surface-hover)", margin: "8px 16px 12px", borderRadius: 10, paddingTop: 10}}>
-          토글 ON → 홈 "데이터베이스" 섹션에 추가됩니다.<br/>
-          <b style={{color: "var(--n-accent)"}}>홈:</b> 라벨이 붙은 항목은 이미 홈 코어 위젯과 연결되어 있어요.
+        <div className="t-footnote muted" style={{padding: "4px 20px 12px", background: "var(--n-surface-hover)", margin: "8px 16px 12px", borderRadius: 10, paddingTop: 10, lineHeight: 1.5}}>
+          토글 ON → 홈 "데이터베이스" 섹션에 원본 DB가 추가됩니다.<br/>
+          Notion에서 선택 권한을 준 DB만 표시됩니다.
         </div>
 
         {/* Search */}
@@ -220,13 +268,31 @@ function DbPickerScreen({ go, goBack }) {
         {loading ? (
           <div style={{padding: "40px 20px", textAlign: "center", color: "var(--n-text-muted)"}}>DB 목록 불러오는 중...</div>
         ) : visible.length === 0 ? (
-          <div style={{padding: "40px 20px", textAlign: "center", color: "var(--n-text-muted)"}}>일치하는 DB 없음</div>
+          <div style={{padding: "32px 20px", textAlign: "center"}}>
+            <div className="t-headline" style={{marginBottom: 8}}>
+              {query.trim() ? "표시할 DB가 없어요" : window.NM_EMPTY_DB_MESSAGE}
+            </div>
+            <div className="t-footnote muted" style={{lineHeight: 1.55, maxWidth: 280, margin: "0 auto 16px"}}>
+              {query.trim()
+                ? "검색어와 일치하는 데이터베이스가 없습니다."
+                : "Notion에서 데이터베이스가 들어있는 페이지를 이 앱에 공유하면 목록에 표시됩니다."}
+            </div>
+            <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+              <button className="btn btn--primary" onClick={() => {
+                window.nmInvalidate && window.nmInvalidate("/api/databases");
+                window.location.href = "/api/oauth/notion/start";
+              }}>
+                Notion 권한 다시 선택
+              </button>
+              <button className="btn" onClick={() => go("token")}>API 연결로 돌아가기</button>
+            </div>
+          </div>
         ) : (
           <div className="g-list">
             {visible.map(d => {
               const homeLabel = DB_TO_HOME_LABEL[d.id];
               return (
-                <div key={d.id} className="g-row g-row--with-icon">
+                <div key={d.id} className="g-row g-row--with-icon" style={{alignItems: "flex-start"}}>
                   <div className="icon-tile icon-tile--lg" style={{background: "var(--n-surface-hover)", fontSize: 18}}>
                     {d.icon && /^https?:\/\//.test(d.icon)
                       ? <img src={d.icon} alt="" style={{width: 24, height: 24, borderRadius: 4, objectFit: "cover"}}/>
@@ -235,6 +301,9 @@ function DbPickerScreen({ go, goBack }) {
                   <div style={{flex: 1, minWidth: 0}}>
                     <div className="t-headline" style={{overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>{d.title}</div>
                     {homeLabel && <div className="t-footnote" style={{color: "var(--n-accent)", fontWeight: 500}}>{homeLabel}</div>}
+                    <div className="t-footnote muted" style={{marginTop: 5}}>
+                      {d.source === "data_source" ? "데이터 소스" : "데이터베이스"} · Notion 원본 속성 유지
+                    </div>
                   </div>
                   <Toggle on={pinned.has(d.id)} onChange={() => togglePin(d.id)}/>
                 </div>
@@ -260,6 +329,15 @@ const CORE_WIDGETS = [
   { key: "reflection", dbKey: "reflection", n: "스크립트", c: "#F4EEEE", fg: "#9F6B53", icon: "✐",  go: "db-list", core: true },
 ];
 
+function defaultCoreWidgetsForConnection() {
+  const mode = window.nmConnectionMode?.() || "demo";
+  if (mode === "owner") return CORE_WIDGETS;
+  const map = window.nmLoadCoreDbMap?.() || {};
+  return CORE_WIDGETS.filter(w => {
+    if (w.key === "calendar") return !!(map.calendar || map.tasks);
+    return !!map[w.dbKey || w.key];
+  });
+}
 
 const DB_COLOR_POOL = [
   { c: "#DDEDEA", fg: "#448361" }, // green
@@ -278,41 +356,170 @@ function colorForDb(id) {
   return DB_COLOR_POOL[hash % DB_COLOR_POOL.length];
 }
 
+function readDbListCache() {
+  const memory = window.__nmDbListCache && Array.isArray(window.__nmDbListCache.data)
+    ? window.__nmDbListCache
+    : null;
+  try {
+    const raw = localStorage.getItem("nm-db-list-cache");
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed?.data)) {
+      if (memory && memory.data.length && (!parsed.at || memory.at >= parsed.at)) return memory.data;
+      window.__nmDbListCache = parsed;
+      return parsed.data;
+    }
+  } catch {}
+  if (memory) return memory.data;
+  return null;
+}
+
+function loadDbList({ force = false } = {}) {
+  const cached = readDbListCache();
+  if (!force && cached) return Promise.resolve(cached);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  return fetch("/api/databases", { cache: "no-store", signal: controller.signal })
+    .then(res => res.ok ? res.json() : { data: [] })
+    .then(json => {
+      const data = Array.isArray(json?.data) ? json.data : [];
+      if (!force && !data.length && cached && cached.length) return cached;
+      const cache = { data, at: Date.now() };
+      window.__nmDbListCache = cache;
+      try { localStorage.setItem("nm-db-list-cache", JSON.stringify(cache)); } catch {}
+      return data;
+    })
+    .catch(() => cached || [])
+    .finally(() => clearTimeout(timer));
+}
+
+function getPrimarySectionId() {
+  const sections = loadSections();
+  return sections[0]?.id || "default";
+}
+
+function getHomePinnedDbIds() {
+  const ids = new Set();
+  try {
+    const rawPins = localStorage.getItem("nm-pinned-dbs");
+    (rawPins ? JSON.parse(rawPins) : []).forEach(id => ids.add(id));
+  } catch {}
+
+  const collect = (list) => {
+    if (!Array.isArray(list)) return;
+    list.forEach(w => {
+      if (w?.dbId) ids.add(w.dbId);
+    });
+  };
+
+  loadSections().forEach(sec => {
+    try {
+      const raw = localStorage.getItem(`nm-section-${sec.id}-widgets`);
+      collect(raw ? JSON.parse(raw) : (sec.id === "default" ? defaultCoreWidgetsForConnection() : []));
+    } catch {}
+  });
+
+  try {
+    const legacyRaw = localStorage.getItem("nm-home-widgets");
+    collect(legacyRaw ? JSON.parse(legacyRaw) : []);
+  } catch {}
+  return ids;
+}
+
+function makeDbWidget(db) {
+  const col = colorForDb(db?.id);
+  return {
+    key: `db-${db.id}`,
+    dbId: db.id,
+    dbKey: null,
+    n: db.title || "(이름 없음)",
+    c: col.c,
+    fg: col.fg,
+    icon: db.icon || "📦",
+    sub: "",
+    go: "db-list",
+  };
+}
+
+function addDbToHome(db) {
+  if (!db?.id) return;
+  const sectionId = getPrimarySectionId();
+  const list = loadSectionWidgets(sectionId);
+  const next = [...list];
+
+  const key = `db-${db.id}`;
+  if (!next.some(w => w.key === key || w.dbId === db.id)) next.push(makeDbWidget(db));
+
+  saveSectionWidgets(sectionId, next);
+  try {
+    const pins = new Set(JSON.parse(localStorage.getItem("nm-pinned-dbs") || "[]"));
+    pins.add(db.id);
+    localStorage.setItem("nm-pinned-dbs", JSON.stringify([...pins]));
+  } catch {}
+  window.dispatchEvent(new CustomEvent("nm-section-update", { detail: { sectionId } }));
+  window.dispatchEvent(new CustomEvent("nm-home-widgets-update", { detail: { sectionId } }));
+}
+
+function removeDbFromHome(id) {
+  if (!id) return;
+  const changedSections = [];
+  loadSections().forEach(sec => {
+    const list = loadSectionWidgets(sec.id);
+    const next = list.filter(w => w.dbId !== id);
+    if (next.length !== list.length) {
+      saveSectionWidgets(sec.id, next);
+      changedSections.push(sec.id);
+    }
+  });
+  try {
+    const pins = new Set(JSON.parse(localStorage.getItem("nm-pinned-dbs") || "[]"));
+    pins.delete(id);
+    localStorage.setItem("nm-pinned-dbs", JSON.stringify([...pins]));
+  } catch {}
+  changedSections.forEach(sectionId => {
+    window.dispatchEvent(new CustomEvent("nm-section-update", { detail: { sectionId } }));
+  });
+  window.dispatchEvent(new CustomEvent("nm-home-widgets-update"));
+}
+
 function loadWidgets() {
   try {
     const raw = localStorage.getItem("nm-home-widgets");
     if (raw) return JSON.parse(raw);
   } catch {}
-  return CORE_WIDGETS;
+  return defaultCoreWidgetsForConnection();
 }
 function saveWidgets(list) {
   localStorage.setItem("nm-home-widgets", JSON.stringify(list));
 }
 
 function HomeScreen({ go, goBack, dark, setDark }) {
-  // ── Mock fallbacks (shown if backend unavailable or returns empty) ─────
-  const MOCK_TODAY = [
-    { t: "디자인 리뷰", time: "10:00 AM", c: "blue" },
-    { t: "스탠드업",    time: "11:00 AM", c: "yellow" },
-    { t: "고객 인터뷰 · 강남 A룸", time: "2:00 PM", c: "orange" },
-  ];
-  const MOCK_RECENT = [];
-
   const [today, setToday] = uS1([]);
   const [widgets, setWidgets] = uS1(loadWidgets);
-  const [recent, setRecent] = uS1([]);
+  const [recent, setRecent] = uS1(() => typeof window !== "undefined" ? window.nmLoadRecentPages?.(4) || [] : []);
   const [editMode, setEditMode] = uS1(false);
   const [draggedKey, setDraggedKey] = uS1(null);
   const [bentoDataCtx, setBentoDataCtx] = uS1({
     openTasks: 0, todayCount: 0, weekDone: 0, financeMonthTotal: 0, nextEvent: null, insightsCount: 0, worksActive: 0,
   });
-  const [loading, setLoading] = uS1(true);
+  // If tasks API is already cached, skip the loading flash on re-entry
+  const [loading, setLoading] = uS1(() =>
+    typeof window !== "undefined" && window.__nmCache?.has(window.nmCoreEndpoint?.("tasks") || "/api/tasks") ? false : true
+  );
   const [isMock, setIsMock] = uS1(false);
   const profileName = (typeof window !== "undefined" ? localStorage.getItem("nm-profile-name") : null) || "효율";
   const now = new Date();
   const weekdayKo = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][now.getDay()];
   const monthShort = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][now.getMonth()];
   const subtitle = `${weekdayKo} · ${monthShort} ${now.getDate()}`;
+  const recentSub = (r) => {
+    if (!r?.at) return r?.sub || "";
+    const diff = Date.now() - Number(r.at);
+    const min = Math.floor(diff / 60000);
+    const hour = Math.floor(diff / 3600000);
+    const day = Math.floor(diff / 86400000);
+    const rel = min < 1 ? "방금" : min < 60 ? `${min}분 전` : hour < 24 ? `${hour}시간 전` : day === 1 ? "어제" : `${day}일 전`;
+    return `${r.sub || "페이지"} · ${rel}`;
+  };
 
   const fetchHomeData = React.useCallback(() => {
     function startOfDay(d) { const c = new Date(d); c.setHours(0,0,0,0); return c; }
@@ -361,11 +568,11 @@ function HomeScreen({ go, goBack, dark, setDark }) {
     let anyMock = false;
 
     Promise.all([
-      fetch("/api/tasks").then(r => r.ok ? r.json() : { data: [], mock: true }).catch(() => ({ data: [], mock: true })),
-      fetch("/api/insights").then(r => r.ok ? r.json() : { data: [], mock: true }).catch(() => ({ data: [], mock: true })),
-      fetch("/api/works").then(r => r.ok ? r.json() : { data: [], mock: true }).catch(() => ({ data: [], mock: true })),
-      fetch("/api/finance").then(r => r.ok ? r.json() : { data: [], mock: true }).catch(() => ({ data: [], mock: true })),
-      fetch("/api/reflection").then(r => r.ok ? r.json() : { data: [], mock: true }).catch(() => ({ data: [], mock: true })),
+      window.nmFetch(window.nmCoreEndpoint?.("tasks") || "/api/tasks").then(j => j || { data: [], mock: false }),
+      window.nmFetch(window.nmCoreEndpoint?.("insights") || "/api/insights").then(j => j || { data: [], mock: false }),
+      window.nmFetch(window.nmCoreEndpoint?.("works") || "/api/works").then(j => j || { data: [], mock: false }),
+      window.nmFetch(window.nmCoreEndpoint?.("finance") || "/api/finance").then(j => j || { data: [], mock: false }),
+      window.nmFetch(window.nmCoreEndpoint?.("reflection") || "/api/reflection").then(j => j || { data: [], mock: false }),
     ]).then(([tasksRes, insightsRes, worksRes, financeRes, reflectionRes]) => {
       const tasks = tasksRes.data || [];
       const insights = insightsRes.data || [];
@@ -387,7 +594,8 @@ function HomeScreen({ go, goBack, dark, setDark }) {
         t.dueDate && startOfDay(new Date(t.dueDate)).getTime() === todayStart.getTime()
       ).length;
       const openCount = tasks.filter(t => !t.done).length;
-      const activeWorks = works.filter(w => w.status === "progress").length;
+      // Works: count all not-done items (some workspaces omit Status → mapStatus defaults to 'todo')
+      const activeWorks = works.filter(w => w.status !== "done").length;
 
       // Update counts on existing widgets (don't overwrite user ordering)
       const countFor = (key) => {
@@ -400,6 +608,18 @@ function HomeScreen({ go, goBack, dark, setDark }) {
         return "";
       };
       setWidgets(curr => curr.map(w => ({ ...w, sub: w.core ? countFor(w.key) : (w.sub || "") })));
+
+      // Publish core stats for DbSection widgets to consume (core metrics by key)
+      const coreStats = {
+        tasks:      `${openCount} open`,
+        calendar:   `오늘 ${todayCount}`,
+        works:      `${activeWorks} active`,
+        insights:   `${insights.length} pages`,
+        finance:    `${finance.length} 건`,
+        reflection: `${reflection.length} 편`,
+      };
+      window.__nmCoreStats = coreStats;
+      window.dispatchEvent(new CustomEvent("nm-core-stats", { detail: coreStats }));
 
       // Bento data
       const nextEv = tasks
@@ -420,7 +640,7 @@ function HomeScreen({ go, goBack, dark, setDark }) {
         worksActive: activeWorks,
       });
 
-      // Recent: mix of insights + works, newest first
+      // Recent fallback: Notion last-edited list. User-selected recents take priority.
       const combined = [
         ...insights.map(i => ({ id: i.id, n: i.title, cat: i.category || "인사이트", at: i.lastEditedAt })),
         ...works.map(w => ({ id: w.id, n: w.title, cat: w.category || "Works", at: null })),
@@ -429,15 +649,15 @@ function HomeScreen({ go, goBack, dark, setDark }) {
         .sort((a, b) => (b.at ? new Date(b.at).getTime() : 0) - (a.at ? new Date(a.at).getTime() : 0))
         .slice(0, 4)
         .map(r => ({ id: r.id, n: r.n, sub: `${r.cat}${r.at ? " · " + relLabel(r.at) : ""}`, icon: catToEmoji(r.cat) }));
-      setRecent(recentItems);
+      const selectedRecent = window.nmLoadRecentPages?.(4) || [];
+      setRecent(selectedRecent.length ? selectedRecent : recentItems);
 
       setIsMock(anyMock);
       setLoading(false);
     }).catch(() => {
-      // Network error → fall back to mock so UI isn't empty
-      setToday(MOCK_TODAY);
-      setRecent(MOCK_RECENT);
-      setIsMock(true);
+      setToday([]);
+      setRecent(window.nmLoadRecentPages?.(4) || []);
+      setIsMock(false);
       setLoading(false);
     });
   }, []);
@@ -447,12 +667,15 @@ function HomeScreen({ go, goBack, dark, setDark }) {
     const interval = setInterval(fetchHomeData, 20000);
     const onVisibility = () => { if (!document.hidden) fetchHomeData(); };
     const onFocus = () => fetchHomeData();
+    const onRecent = () => setRecent(window.nmLoadRecentPages?.(4) || []);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onFocus);
+    window.addEventListener("nm-recent-update", onRecent);
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("nm-recent-update", onRecent);
     };
   }, [fetchHomeData]);
 
@@ -497,11 +720,14 @@ function HomeScreen({ go, goBack, dark, setDark }) {
                   // Optimistic: remove from today immediately
                   setToday(list => list.filter(x => x.id !== e.id));
                   try {
-                    await fetch("/api/tasks", {
+                    const taskUrl = window.nmCoreEndpoint?.("tasks") || "/api/tasks";
+                    await fetch(taskUrl, {
                       method: "POST",
                       headers: {"Content-Type": "application/json"},
-                      body: JSON.stringify({id: e.id, done: true}),
+                      body: JSON.stringify({id: e.id, done: true, dbId: window.nmCoreDbId?.("tasks")}),
                     });
+                    window.nmInvalidate && window.nmInvalidate("/api/tasks");
+                    window.nmInvalidate && window.nmInvalidate(taskUrl);
                   } catch {}
                 }}
                 aria-label="완료"
@@ -539,7 +765,7 @@ function HomeScreen({ go, goBack, dark, setDark }) {
               <div className="icon-tile">{r.icon}</div>
               <div style={{flex: 1}}>
                 <div className="t-body" style={{fontWeight: 500}}>{r.n}</div>
-                <div className="t-footnote">{r.sub}</div>
+                <div className="t-footnote">{recentSub(r)}</div>
               </div>
               <div className="chev"/>
             </div>
@@ -680,10 +906,12 @@ function InboxScreen({ go }) {
   const nowDay = startOfDay(new Date());
 
   const loadData = React.useCallback(() => {
-    setLoading(true);
+    const taskUrl = window.nmCoreEndpoint?.("tasks") || "/api/tasks";
+    const hasCache = window.__nmCache?.has(taskUrl);
+    if (!hasCache) setLoading(true);
     Promise.all([
-      fetch("/api/tasks").then(r => r.ok ? r.json() : {data: []}).catch(() => ({data: []})),
-      fetch("/api/insights?dbId=247003c7-f7be-80c0-a9f4-cddbcd337415").then(r => r.ok ? r.json() : {data: []}).catch(() => ({data: []})),
+      window.nmFetch(taskUrl).then(j => j || {data: []}),
+      window.nmFetch(window.nmCoreEndpoint?.("insights") || "/api/insights").then(j => j || {data: []}),
     ]).then(([tasksRes, scrapRes]) => {
       const tasks = tasksRes.data || [];
       setOverdue(tasks.filter(t => !t.done && t.dueDate && startOfDay(new Date(t.dueDate)) < nowDay)
@@ -707,11 +935,14 @@ function InboxScreen({ go }) {
     setOverdue(list => list.filter(t => t.id !== taskId));
     setTodayList(list => list.filter(t => t.id !== taskId));
     try {
-      await fetch("/api/tasks", {
+      const taskUrl = window.nmCoreEndpoint?.("tasks") || "/api/tasks";
+      await fetch(taskUrl, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({id: taskId, done: !currentDone}),
+        body: JSON.stringify({id: taskId, done: !currentDone, dbId: window.nmCoreDbId?.("tasks")}),
       });
+      window.nmInvalidate && window.nmInvalidate("/api/tasks");
+      window.nmInvalidate && window.nmInvalidate(taskUrl);
     } catch (e) {
       loadData();
     }
@@ -1012,39 +1243,47 @@ function BentoSection({ go, dataCtx }) {
 
 /* ── Widget add sheet (DB list) ─────────────── */
 function AddWidgetSheet({ onClose, onAdd, go }) {
-  const [dbList, setDbList] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
+  const [dbList, setDbList] = React.useState(() => readDbListCache() || []);
+  const [loading, setLoading] = React.useState(() => !(readDbListCache() || []).length);
   const [query, setQuery] = React.useState("");
 
   React.useEffect(() => {
-    fetch("/api/databases")
-      .then(r => r.ok ? r.json() : { data: [] })
-      .then(j => { setDbList(j.data || []); setLoading(false); })
-      .catch(() => setLoading(false));
+    let cancelled = false;
+    loadDbList({ force: true })
+      .then(list => {
+        if (cancelled) return;
+        setDbList(list);
+        setLoading(false);
+      })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const visible = query.trim()
     ? dbList.filter(d => d.title.toLowerCase().includes(query.toLowerCase()))
     : dbList;
 
-  return (
+  const sheet = (
     <>
       <div
         onClick={onClose}
-        style={{position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 70}}
+        style={{position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 70}}
       />
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          position: "fixed", left: 0, right: 0, bottom: 0,
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: "var(--nm-keyboard-bottom, 0px)",
           background: "var(--n-bg-grouped)",
           borderRadius: "22px 22px 0 0",
           padding: "10px 16px 0",
-          maxHeight: "78vh",
+          maxHeight: "calc(78dvh - var(--nm-keyboard-bottom, 0px))",
           display: "flex", flexDirection: "column",
           zIndex: 71,
           boxShadow: "0 -20px 40px rgba(0,0,0,0.15)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 110px)",
+          paddingBottom: "calc(22px + var(--safe-b, env(safe-area-inset-bottom, 0px)))",
         }}>
         <div style={{width: 36, height: 4, borderRadius: 2, background: "var(--n-border-strong)", margin: "0 auto 10px"}}/>
         <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10}}>
@@ -1062,9 +1301,20 @@ function AddWidgetSheet({ onClose, onAdd, go }) {
         </div>
         <div style={{overflowY: "auto", flex: 1}} className="hide-scroll">
           {loading ? (
-            <div style={{padding: 30, textAlign: "center", color: "var(--n-text-muted)"}}>불러오는 중...</div>
+            <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} style={{
+                  height: 58, borderRadius: 12,
+                  background: "linear-gradient(90deg, var(--n-surface) 0%, var(--n-surface-hover) 45%, var(--n-surface) 90%)",
+                  backgroundSize: "220% 100%",
+                  animation: "nm-shimmer 1.2s ease-in-out infinite",
+                }}/>
+              ))}
+            </div>
           ) : visible.length === 0 ? (
-            <div style={{padding: 30, textAlign: "center", color: "var(--n-text-muted)"}}>일치 없음</div>
+            <div style={{padding: 30, textAlign: "center", color: "var(--n-text-muted)"}}>
+              {query.trim() ? "일치 없음" : window.NM_EMPTY_DB_MESSAGE}
+            </div>
           ) : (
             visible.map(d => (
               <button key={d.id} onClick={() => onAdd(d)}
@@ -1092,6 +1342,9 @@ function AddWidgetSheet({ onClose, onAdd, go }) {
       </div>
     </>
   );
+
+  const host = document.querySelector(".phone") || document.body;
+  return ReactDOM.createPortal(sheet, host);
 }
 
 
@@ -1115,11 +1368,52 @@ function saveSections(list) { localStorage.setItem("nm-sections", JSON.stringify
 function loadSectionWidgets(id) {
   try {
     const raw = localStorage.getItem(`nm-section-${id}-widgets`);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return id === "default" ? ensureCalendarCoreWidget(parsed) : parsed;
+      }
+    }
   } catch {}
-  // First-load defaults: "default" gets CORE_WIDGETS, others start empty
-  if (id === "default") return CORE_WIDGETS;
+  if (id === "default") {
+    try {
+      const legacy = localStorage.getItem("nm-home-widgets");
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        if (Array.isArray(parsed)) {
+          const migrated = ensureCalendarCoreWidget(parsed);
+          saveSectionWidgets(id, migrated);
+          return migrated;
+        }
+      }
+    } catch {}
+  }
+  // First-load defaults are mode-aware: owner keeps curated cards, other users only see mapped DBs.
+  if (id === "default") return defaultCoreWidgetsForConnection();
   return [];
+}
+
+// Ensure the "default" home section always contains a Calendar core widget when
+// the user has a tasks DB mapped — calendar disappeared after drag/remove could
+// leave the section without a calendar entry. Re-inject idempotently.
+function ensureCalendarCoreWidget(list) {
+  if (!Array.isArray(list)) return list;
+  if (list.some(w => w && (w.key === "calendar" || w.go === "calendar"))) return list;
+  const map = (typeof window !== "undefined" && window.nmLoadCoreDbMap) ? window.nmLoadCoreDbMap() : {};
+  const mode = (typeof window !== "undefined" && window.nmConnectionMode) ? window.nmConnectionMode() : "demo";
+  const hasTasks = Boolean(map.calendar || map.tasks) || mode === "owner";
+  if (!hasTasks) return list;
+  const calendarWidget = CORE_WIDGETS.find(w => w.key === "calendar");
+  if (!calendarWidget) return list;
+  // Insert just after tasks if present, otherwise at the start
+  const tasksIdx = list.findIndex(w => w && (w.key === "tasks" || w.dbKey === "tasks"));
+  const next = list.slice();
+  const insertAt = tasksIdx >= 0 ? tasksIdx + 1 : 0;
+  next.splice(insertAt, 0, { ...calendarWidget });
+  try {
+    localStorage.setItem("nm-section-default-widgets", JSON.stringify(next));
+  } catch {}
+  return next;
 }
 function saveSectionWidgets(id, list) {
   localStorage.setItem(`nm-section-${id}-widgets`, JSON.stringify(list));
@@ -1128,6 +1422,21 @@ function saveSectionWidgets(id, list) {
 function SectionList({ go }) {
   const [sections, setSections] = uS1(loadSections);
   const [editMode, setEditMode] = uS1(false);
+  const [version, setVersion] = uS1(0);
+
+  uE1(() => {
+    const refresh = () => setVersion(v => v + 1);
+    window.addEventListener("nm-section-update", refresh);
+    window.addEventListener("nm-home-widgets-update", refresh);
+    window.addEventListener("nm-connection-update", refresh);
+    return () => {
+      window.removeEventListener("nm-section-update", refresh);
+      window.removeEventListener("nm-home-widgets-update", refresh);
+      window.removeEventListener("nm-connection-update", refresh);
+    };
+  }, []);
+
+  const hasAnyWidgets = sections.some(sec => loadSectionWidgets(sec.id).length > 0);
 
   const renameSection = (id, name) => {
     const next = sections.map(s => s.id === id ? {...s, name: name.trim() || s.name} : s);
@@ -1147,18 +1456,44 @@ function SectionList({ go }) {
 
   return (
     <>
-      {sections.map(sec => (
-        <DbSection
-          key={sec.id}
-          go={go}
-          section={sec}
-          isFirst={sec.id === sections[0].id}
-          editMode={editMode}
-          setEditMode={setEditMode}
-          onRename={(name) => renameSection(sec.id, name)}
-          onRemove={() => removeSection(sec.id)}
-        />
-      ))}
+      {hasAnyWidgets || editMode ? (
+        sections.map(sec => (
+          <DbSection
+            key={`${sec.id}-${version}`}
+            go={go}
+            section={sec}
+            isFirst={sec.id === sections[0].id}
+            editMode={editMode}
+            setEditMode={setEditMode}
+            onRename={(name) => renameSection(sec.id, name)}
+            onRemove={() => removeSection(sec.id)}
+          />
+        ))
+      ) : (
+        <>
+          <div className="g-header" style={{paddingTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 16}}>
+            <span>데이터베이스</span>
+            <button onClick={() => setEditMode(true)} aria-label="편집" style={{
+              border: "none", background: "transparent", color: "var(--n-text-muted)",
+              cursor: "pointer", width: 20, height: 20, borderRadius: 10,
+              display: "grid", placeItems: "center", padding: 0,
+            }}>
+              <Icon name="pencil" size={12} color="var(--n-text-muted)" strokeWidth={1.8}/>
+            </button>
+          </div>
+          <div style={{
+            margin: "10px 16px 8px",
+            padding: "28px 18px",
+            borderRadius: "var(--r-lg)",
+            background: "var(--n-surface)",
+            color: "var(--n-text-muted)",
+            textAlign: "center",
+            boxShadow: "var(--sh-1)",
+          }}>
+            <div className="t-body" style={{fontWeight: 500}}>{window.NM_EMPTY_DB_MESSAGE}</div>
+          </div>
+        </>
+      )}
       {editMode && (
         <div style={{padding: "4px 16px 0"}}>
           <button onClick={addSection} style={{
@@ -1181,8 +1516,66 @@ function SectionList({ go }) {
 function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRemove }) {
   const [widgets, setWidgets] = React.useState(() => loadSectionWidgets(section.id));
   const [draggedKey, setDraggedKey] = React.useState(null);
+  const [coreStats, setCoreStats] = React.useState(() => (typeof window !== "undefined" ? (window.__nmCoreStats || {}) : {}));
+  const [customStats, setCustomStats] = React.useState({}); // { dbId: "N 개" }
   const containerRef = React.useRef(null);
   const prevRectsRef = React.useRef(new Map());
+
+  // Subscribe to core stats updates from HomeScreen
+  React.useEffect(() => {
+    const handler = (e) => setCoreStats(e.detail || {});
+    window.addEventListener("nm-core-stats", handler);
+    if (window.__nmCoreStats) setCoreStats(window.__nmCoreStats);
+    return () => window.removeEventListener("nm-core-stats", handler);
+  }, []);
+
+  // Fetch page counts for custom-DB widgets (dbId present, not core)
+  React.useEffect(() => {
+    const cache = (window.__nmCustomDbCountCache = window.__nmCustomDbCountCache || {});
+    const customIds = widgets
+      .filter(w => w.dbId && !w.core && !w.dbKey)
+      .map(w => w.dbId);
+    if (!customIds.length) return;
+
+    let cancelled = false;
+    const pending = customIds.filter(id => {
+      const c = cache[id];
+      return !c || (Date.now() - c.at) > 20000; // 20s cache window
+    });
+    // Hydrate from cache immediately
+    const initial = {};
+    customIds.forEach(id => { if (cache[id]) initial[id] = cache[id].label; });
+    if (Object.keys(initial).length) setCustomStats(prev => ({ ...prev, ...initial }));
+
+    if (!pending.length) return;
+    Promise.all(pending.map(id =>
+      window.nmFetch(`/api/database-pages?dbId=${encodeURIComponent(id)}`)
+        .then(j => ({ id, count: Array.isArray(j?.data) ? j.data.length : 0 }))
+        .catch(() => ({ id, count: null }))
+    )).then(results => {
+      if (cancelled) return;
+      const patch = {};
+      results.forEach(({ id, count }) => {
+        if (count === null) return;
+        const label = `${count} 개`;
+        cache[id] = { at: Date.now(), label };
+        patch[id] = label;
+      });
+      if (Object.keys(patch).length) setCustomStats(prev => ({ ...prev, ...patch }));
+    });
+    return () => { cancelled = true; };
+  }, [widgets]);
+
+  // Compute display subtitle for a widget
+  const subFor = React.useCallback((w) => {
+    // Core widgets — use key lookup
+    if (w.core && coreStats[w.key]) return coreStats[w.key];
+    // Widgets referencing a core dbKey (e.g. calendar aliased)
+    if (w.dbKey && coreStats[w.dbKey]) return coreStats[w.dbKey];
+    // Custom DB widgets
+    if (w.dbId && customStats[w.dbId]) return customStats[w.dbId];
+    return w.sub || "";
+  }, [coreStats, customStats]);
 
   const saveW = (list) => {
     // Snapshot positions before layout change (FLIP: First)
@@ -1251,7 +1644,14 @@ function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRe
       n: db.title, c: col.c, fg: col.fg,
       icon: db.icon || "📦", sub: "", go: "db-list",
     }];
-    saveW(next); setPickerOpen(false);
+    saveW(next);
+    try {
+      const pins = new Set(JSON.parse(localStorage.getItem("nm-pinned-dbs") || "[]"));
+      pins.add(db.id);
+      localStorage.setItem("nm-pinned-dbs", JSON.stringify([...pins]));
+    } catch {}
+    window.dispatchEvent(new CustomEvent("nm-home-widgets-update", { detail: { sectionId: section.id } }));
+    setPickerOpen(false);
   };
 
   return (
@@ -1370,7 +1770,7 @@ function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRe
                         // Cross-section: move widget from this section to target
                         const targetRaw = localStorage.getItem(`nm-section-${hoverSectionId}-widgets`);
                         let targetList = [];
-                        try { targetList = targetRaw ? JSON.parse(targetRaw) : (hoverSectionId === "default" ? CORE_WIDGETS : []); } catch {}
+                        try { targetList = targetRaw ? JSON.parse(targetRaw) : (hoverSectionId === "default" ? defaultCoreWidgetsForConnection() : []); } catch {}
                         // Avoid duplicate
                         if (targetList.find(w => w.key === d.key)) return;
                         const insertAt = targetList.findIndex(w => w.key === hoverWidgetKey);
@@ -1457,8 +1857,20 @@ function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRe
                   ? <img src={d.icon} alt="" style={{width: 22, height: 22, borderRadius: 4, objectFit: "cover"}}/>
                   : d.icon}
               </div>
-              <div className="t-headline">{d.n}</div>
-              <div className="t-footnote">{d.sub}</div>
+              <div
+                className="t-headline"
+                title={d.n}
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  wordBreak: "keep-all",
+                  overflowWrap: "normal",
+                  fontSize: 15,
+                  lineHeight: "20px",
+                }}
+              >{d.n}</div>
+              <div className="t-footnote" style={{whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>{subFor(d)}</div>
             </div>
           );
         })}
@@ -1488,4 +1900,4 @@ function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRe
   );
 }
 
-Object.assign(window, { OnboardingScreen, BentoSection, AddWidgetSheet, SectionList, DbSection, TokenScreen, DbPickerScreen, HomeScreen, SearchScreen, InboxScreen });
+Object.assign(window, { OnboardingScreen, BentoSection, AddWidgetSheet, SectionList, DbSection, TokenScreen, DbPickerScreen, HomeScreen, SearchScreen, InboxScreen, defaultCoreWidgetsForConnection });
