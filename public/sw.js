@@ -1,4 +1,4 @@
-const CACHE_VERSION = "beyondworks-pwa-v4-20260423";
+const CACHE_VERSION = "nolio-pwa-v5-20260424";
 const APP_SHELL = [
   "/manifest.json",
   "/offline.html",
