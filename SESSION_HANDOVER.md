@@ -1,5 +1,125 @@
 # Session Handover
 
+## 최신 핸드오버: 2026-04-24 Claude Code 세션 종료
+
+### 현재 상태
+- 브랜치: `claude/fervent-mccarthy` (push 완료). `main`도 FF 머지 + push 완료.
+- 최신 커밋: `e1e0335 fix(mobile): safe-area top notch overlap + keyboard gap + calendar DB picker`
+- Vercel 프로덕션: https://notion-to-lean.vercel.app (여러 번 재배포 — 최신 deploy `Ready`)
+- 작업 트리 clean (미커밋 없음)
+
+### 이번 세션 완료 작업
+
+#### 1. Codex 세션 성과 커밋 + main 푸시
+Codex가 이전 세션에서 작업한 모든 변경(40+ 파일)을 논리 단위로 6개 커밋으로 정리하고 `claude/fervent-mccarthy` → `main` FF 머지, 프로덕션 배포:
+- `4cbda8c chore(pwa)`: Nolio 브랜딩 + manifest/sw/offline + 아이콘 세트 + vendored React
+- `b5b2c3e feat(auth)`: Notion OAuth + encrypted HttpOnly 세션/매핑 쿠키
+- `dbe9486 feat(api)`: mock 제거 + DB schema auto-discovery + block update/archive
+- `cd52d78 feat(mobile)`: safe-area + visualViewport 키보드 metrics
+- `21973de feat(home)`: CRUD + filter/more sheets + theme sync + calendar migration + 타이포
+- `abceb2a docs`: SESSION_HANDOVER + README 업데이트
+
+#### 2. Works 카드 카운트 오류 수정
+- 이슈: Works DB에 Status 컬럼이 없어 mapStatus fallback으로 전부 'todo' → "0 active" 표시
+- 수정: `public/design/src/app-screens-1.jsx` — `activeWorks`를 `status !== "done"` 로 확대 (진행중 엄격 기준 제거)
+
+#### 3. Ralph 이터레이션 ①: 노치 테마 + 캘린더 복원 + 카드 타이포
+- `Notion Mobile App.html`: meta `theme-color` 3-variant (light/dark/main) + `setDark` 효과에서 light=`#F1EEE7` / dark=`#0E0E0E`로 동기화 → 노치/상태바가 테마에 맞게 색 바뀜
+- `app-screens-1.jsx`: `ensureCalendarCoreWidget()` migration — default 섹션에 calendar 누락 시 tasks 뒤로 자동 재삽입
+- `app-screens-1.jsx`: 홈 DB 카드 제목 inline `whiteSpace:nowrap / overflow:hidden / ellipsis / fontSize:15 / wordBreak:keep-all` → Beyond_Tasks 2줄 깨짐 방지
+- `notion-ios.css`: 전역 `.t-* { overflow-wrap: anywhere }` escape hatch — element-level nowrap이 깨짐 규칙 이기도록 `[style*="white-space: nowrap"]` 셀렉터 추가
+- Architect 리뷰 APPROVED (22 criteria)
+
+#### 4. SW cache 버전 범프 + manifest 테마 색
+- 이슈: 설치된 PWA에서 업데이트 반영 안 됨. 원인: 이전 SW `CACHE_VERSION = beyondworks-pwa-v4` 바이트 동일 → 브라우저가 SW 업데이트 감지 안 함
+- 수정 (`2b2682f`):
+  - `public/sw.js`: `CACHE_VERSION` v4 → `nolio-pwa-v5-20260424` (강제 re-install + activate + client.navigate reload)
+  - `public/manifest.json`: `background_color` / `theme_color` `#f7f6f3` → `#F1EEE7` (Nolio warm beige)
+
+#### 5. Ralph 이터레이션 ②: 모바일 safe-area/keyboard UX + 캘린더 DB 선택 (`e1e0335`)
+- **노치 헤더 겹침 수정** (`app-shared.jsx` NavBar): compact 모드 타이틀이 `position: absolute`였는데 부모에 `position: relative` 없어 Phone 컨테이너 top=0(노치)로 탈출. 내부 row에 `position: relative` 추가
+- **키보드 위 빈 공간 수정** (`app-screens-3.jsx` EventEditScreen + `app-screens-1.jsx` AddWidgetSheet):
+  - Phone height가 이미 `--nm-app-height` = visualViewport.height (키보드 제외)인데, 시트에 `bottom: var(--nm-keyboard-bottom)` 해서 이중 오프셋 → 시트가 키보드 높이만큼 위로 밀리고 아래에 빈 Phone 배경 노출
+  - 수정: `bottom: 0` + `maxHeight: calc(var(--nm-app-height) - var(--safe-t) - 24px)` (dvh 사용 중단)
+- **캘린더 위젯 DB 선택**:
+  - `app-screens-1.jsx` AddWidgetSheet: 각 DB 행에 `리스트 / 캘린더` 두 버튼. 캘린더 선택 시 `{ go: "calendar", dbId, dbKey: "calendar" }` 위젯 생성
+  - `app-screens-1.jsx` DbSection `addDb(db, mode)` 시그니처 확장
+  - `app-screens-2.jsx` CalendarScreen: `ctx.dbId` 있으면 `/api/database-pages?dbId=X` 쿼리 → 첫 date-type 속성을 이벤트 날짜로 사용. 없으면 기존 tasks fallback (backward compat)
+
+### 미완료 핵심 이슈
+
+#### High priority
+- **모바일 PWA 데이터베이스 매핑 자동 소실 (critical UX bug)**
+  - 증상: 전날 스크린샷에선 Beyond_Tasks/Works/Insights 카드 표시되었으나, SW 업데이트/OAuth 세션 refresh 후 "노션에서 데이터베이스를 추가해주세요" 빈 상태로 전환됨
+  - 추정 원인: `nmRefreshSession()` 내부의 "워크스페이스 key 변경 시 `nmClearWorkspaceLocalState()` 호출" 로직이 false-positive로 발동 → `nm-core-db-map` 삭제
+  - 다음 단계: `app-shared.jsx`에서 workspace key 비교 로직 점검, refresh 시 same-workspace인지 확인 후 clear 여부 결정. 또는 OAuth 세션 fresh 시 서버 매핑을 항상 신뢰하도록 보강
+- **최신 모바일 PWA fix 사용자 재확인 필요**
+  - 배포된 e1e0335의 notch/keyboard/calendar 수정이 실제 iPhone PWA에서 정상 작동하는지 미검증. 사용자 스크린샷 피드백 받은 뒤 추가 조정 가능성
+
+#### Medium priority
+- **탭바 뒤 콘텐츠 fade 누락**
+  - Marketing 카드가 탭바 뒤로 비쳐 보임. 이전에 `mask-image`로 처리했던 fade가 빠진 상태
+  - 다음 단계: `.scroll-fade` 클래스 혹은 해당 컨테이너 CSS 복원
+- **Notion Desktop DB wrapper 목표 재정렬**
+  - 커스텀 DB가 여전히 `/api/insights?dbId=` adapter를 타면서 insight-shape에 묶임
+  - Generic DB renderer + schema/view/filter adapter 설계 필요 (큰 리팩터)
+- **DB 목록 중복/속도**
+  - 검색+child_database scan으로 중복 항목 UX 구분 부족
+- **설정 → 사용할 DB 선택**
+  - 로딩 길게 걸림. skeleton/timeout/증분 로딩 필요
+
+#### Low priority
+- `npm run lint` 광범위 부채 정리 (figma-ui/public/design/no-explicit-any)
+- 홈 pin vs role mapping 데이터 모델 분리 (`nm-core-db-map` vs `nm-pinned-dbs`)
+- iOS 실제 디바이스 PWA에서 keyboard/safe-area 수동 검증
+
+### 에러/학습
+
+#### PWA SW 업데이트 함정
+- SW 파일 바이트가 byte-identical이면 브라우저가 새 install 트리거 안 함. → 의미 있는 변경 없이도 `CACHE_VERSION` 상수를 바꾸면 강제 재설치 유발
+- `isMutableAppAsset` + `networkFirst`로 mutable 자산은 매번 네트워크 fetch하게 설계되어 있음 → 자산 변경은 즉시 반영됨. 하지만 OLD SW는 새 rule을 모르므로, 첫 배포 이후 rule 확장은 반드시 버전 범프 필요
+- `activate` 이벤트에서 `client.navigate(url)`로 모든 `/app` `/design/*` 창 자동 리로드 처리
+- Vercel edge 캐시 `age: 437s` 보여도 `cache-control: max-age=0, must-revalidate`라 revalidate는 되지만 PWA의 실제 body 반영은 SW 인터셉트에 달림
+
+#### CSS `position: absolute` + safe-area
+- `position: absolute` 요소는 가장 가까운 `position != static` 조상에 앵커됨. 부모가 relative가 아니면 의도치 않게 위로 탈출
+- 특히 NavBar 같은 safe-area-padded 컨테이너에서 내부 absolute 요소는 반드시 **부모 row를 `position: relative`로** 지정해야 노치 침범 방지
+
+#### 이중 viewport 오프셋
+- `visualViewport.height`를 이미 반영한 컨테이너(예: `height: var(--nm-app-height)`) 내부에서 자식 시트가 다시 `bottom: var(--nm-keyboard-bottom)`를 쓰면 **이중 빼기** 발생 → 키보드 위 빈 공간
+- 해결: keyboard 오프셋은 **최상위 컨테이너에서만** 적용. 자식은 `bottom: 0`과 `maxHeight`만 쓰기
+
+#### dvh와 iOS PWA 키보드
+- `dvh` (dynamic viewport height)는 iOS PWA standalone 모드에서 키보드 up 시 축소되지 않을 수 있음. 대신 `var(--nm-app-height)`에 visualViewport.height를 주입해 안정적으로 사용
+
+### 다음 세션 시작 시
+
+1. **상태 확인**:
+   ```bash
+   git status --short
+   git log --oneline -5
+   ```
+2. **프로덕션 smoke**:
+   ```bash
+   curl -sI "https://notion-to-lean.vercel.app/app" | head -6
+   curl -s "https://notion-to-lean.vercel.app/sw.js" | head -2
+   ```
+3. **모바일 PWA 재오픈 피드백 수신 후**:
+   - 노치/키보드/캘린더 픽스 정상 작동 시 → 매핑 소실 이슈(High-1) 착수
+   - 문제 남아있으면 실제 디바이스 스크린샷 요청 후 적절한 픽스
+4. **우선순위 선택**:
+   - A) 매핑 소실 원인 근절 (nmRefreshSession workspace-key 로직 점검)
+   - B) 탭바 뒤 mask-image fade 복원
+   - C) Generic DB renderer 리팩터 (큰 작업)
+
+### 커밋/푸시 주의
+- 현재 로컬과 origin/main 동기화 완료
+- 문서 커밋(`docs: session handover update`)만 추가로 할 예정
+- 파일 단위 명시적 stage (`git add .` 금지)
+- 커밋 전 `git diff --cached`에서 `password|secret|key|token|api_key|DATABASE_URL` grep 검증
+
+---
+
 ## 최신 핸드오버: 2026-04-23 Codex → Claude Code
 
 ### 현재 상태 요약
