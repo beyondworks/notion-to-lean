@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import type { Work } from '@/lib/types';
 import {
   isNotionEnabled,
+  getRequestApiKey,
   queryDatabase,
   getPropertyValueMulti,
   pageUrl,
   DB_IDS,
 } from '@/lib/notion';
-import { MOCK_WORKS } from '@/lib/mock-data';
+import { getDbMappingFromRequest } from '@/lib/notion-session';
 
 // ---------------------------------------------------------------------------
 // Status mapping helpers
@@ -96,17 +97,22 @@ function pageToWork(page: any): Work {
 // ---------------------------------------------------------------------------
 // GET /api/works
 // ---------------------------------------------------------------------------
-export async function GET() {
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ data: MOCK_WORKS, mock: true });
+export async function GET(request: Request) {
+  const token = getRequestApiKey(request);
+  const { searchParams } = new URL(request.url);
+  const mapping = getDbMappingFromRequest(request);
+  const dbId = searchParams.get('dbId') || mapping.works || DB_IDS.WORKS;
+
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ data: [], mock: false });
   }
 
   try {
-    const pages = await queryDatabase(DB_IDS.WORKS);
+    const pages = await queryDatabase(dbId, undefined, undefined, token);
     const data: Work[] = pages.map(pageToWork);
     return NextResponse.json({ data, mock: false });
   } catch (err) {
-    console.warn('[notion fallback]', err instanceof Error ? err.message : err);
-    return NextResponse.json({ data: MOCK_WORKS, mock: true, fallback: true });
+    console.warn('[works GET]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ data: [], mock: false, error: 'query failed' });
   }
 }

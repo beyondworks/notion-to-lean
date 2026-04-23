@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isNotionEnabled, getPageBlocks, appendBlocks, queryDatabase, getPropertyValueMulti, pageUrl } from '@/lib/notion';
+import { getRequestApiKey, isNotionEnabled, getPageBlocks, appendBlocks, queryDatabase, getPropertyValueMulti, pageUrl, updateBlock } from '@/lib/notion';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -27,7 +27,7 @@ function extractTableRow(block: any): string[] {
   );
 }
 
-async function mapBlockRecursive(block: any): Promise<any> {
+async function mapBlockRecursive(block: any, token: string | null): Promise<any> {
   const base: any = {
     id: block.id,
     type: block.type,
@@ -91,7 +91,7 @@ async function mapBlockRecursive(block: any): Promise<any> {
     base.databaseTitle = block.child_database?.title ?? '';
     // block.id is the database id — query for entries (top 20)
     try {
-      const rows = await queryDatabase(block.id);
+      const rows = await queryDatabase(block.id, undefined, undefined, token);
       base.entries = rows.slice(0, 20).map((row: any) => {
         const title = getPropertyValueMulti(
           row,
@@ -123,8 +123,8 @@ async function mapBlockRecursive(block: any): Promise<any> {
   // (toggle, bulleted_list_item, numbered_list_item, to_do, table, quote, column, column_list, synced_block, callout)
   if (block.has_children) {
     try {
-      const children = await getPageBlocks(block.id);
-      base.children = await Promise.all(children.map(mapBlockRecursive));
+      const children = await getPageBlocks(block.id, token);
+      base.children = await Promise.all(children.map(child => mapBlockRecursive(child, token)));
     } catch {
       base.children = [];
     }
@@ -137,18 +137,19 @@ async function mapBlockRecursive(block: any): Promise<any> {
 // GET /api/pages/[id]/blocks — Retrieve page blocks
 // ---------------------------------------------------------------------------
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const token = getRequestApiKey(request);
 
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ data: [], mock: true });
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ data: [], mock: false });
   }
 
   try {
-    const rawBlocks = await getPageBlocks(id);
-    const data = await Promise.all(rawBlocks.map(mapBlockRecursive));
+    const rawBlocks = await getPageBlocks(id, token);
+    const data = await Promise.all(rawBlocks.map(block => mapBlockRecursive(block, token)));
     return NextResponse.json({ data, mock: false });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -165,24 +166,73 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const token = getRequestApiKey(request);
 
-  let body: { blocks?: any[] };
+  let body: {
+    blocks?: any[];
+    blockId?: string;
+    checked?: boolean;
+    content?: string;
+    blockType?: string; // optional hint (paragraph | heading_1 | ... | bulleted_list_item | quote | to_do | callout | code)
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  if (!Array.isArray(body.blocks) || body.blocks.length === 0) {
-    return NextResponse.json({ error: 'blocks array is required and must not be empty' }, { status: 400 });
+  // Branch 1: update a single block (checkbox or text content)
+  if (body.blockId) {
+    if (!isNotionEnabled(token)) {
+      return NextResponse.json({ error: 'Notion connection required' }, { status: 401 });
+    }
+    try {
+      // Checkbox toggle
+      if (typeof body.checked === 'boolean') {
+        await updateBlock(body.blockId, { to_do: { checked: body.checked } }, token);
+        return NextResponse.json({ success: true, mock: false });
+      }
+      // Text content edit
+      if (typeof body.content === 'string') {
+        const type = body.blockType || 'paragraph';
+        // Types that store text in a `rich_text` array
+        const richTextTypes = new Set([
+          'paragraph', 'heading_1', 'heading_2', 'heading_3',
+          'bulleted_list_item', 'numbered_list_item', 'to_do',
+          'toggle', 'quote', 'callout', 'code',
+        ]);
+        if (!richTextTypes.has(type)) {
+          return NextResponse.json({ error: `Unsupported blockType for text edit: ${type}` }, { status: 400 });
+        }
+        const payload: Record<string, unknown> = {
+          [type]: {
+            rich_text: body.content.length
+              ? [{ type: 'text', text: { content: body.content } }]
+              : [],
+          },
+        };
+        await updateBlock(body.blockId, payload, token);
+        return NextResponse.json({ success: true, mock: false });
+      }
+      return NextResponse.json({ error: 'blockId requires either `checked` or `content`' }, { status: 400 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[pages/[id]/blocks PATCH update]', message);
+      return NextResponse.json({ error: 'Failed to update block', detail: message }, { status: 500 });
+    }
   }
 
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ success: true, mock: true });
+  // Branch 2: append new blocks
+  if (!Array.isArray(body.blocks) || body.blocks.length === 0) {
+    return NextResponse.json({ error: 'Either blockId (update) or blocks[] (append) is required' }, { status: 400 });
+  }
+
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ error: 'Notion connection required' }, { status: 401 });
   }
 
   try {
-    await appendBlocks(id, body.blocks);
+    await appendBlocks(id, body.blocks, token);
     return NextResponse.json({ success: true, mock: false });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

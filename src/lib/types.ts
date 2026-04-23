@@ -25,6 +25,7 @@ export interface Insight {
   coverColor: string;
   tags: string[];
   date: string | null;
+  createdAt?: string | null;
   lastEditedAt?: string;
   notionUrl?: string;
 }
@@ -36,6 +37,8 @@ export interface Work {
   category: string;
   coverColor: string;
   status: 'done' | 'progress' | 'todo';
+  createdAt?: string | null;
+  lastEditedAt?: string | null;
   notionUrl?: string;
 }
 

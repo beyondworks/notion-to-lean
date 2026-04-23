@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import type { Insight } from '@/lib/types';
 import {
   isNotionEnabled,
+  getRequestApiKey,
   queryDatabase,
   getPropertyValueMulti,
   pageUrl,
   DB_IDS,
 } from '@/lib/notion';
-import { MOCK_INSIGHTS } from '@/lib/mock-data';
+import { getDbMappingFromRequest } from '@/lib/notion-session';
 
 // ---------------------------------------------------------------------------
 // Category -> gradient mapping (fallback when Notion has no cover color)
@@ -82,19 +83,21 @@ function pageToInsight(page: any): Insight {
 // GET /api/insights
 // ---------------------------------------------------------------------------
 export async function GET(request: Request) {
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ data: MOCK_INSIGHTS, mock: true });
+  const token = getRequestApiKey(request);
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ data: [], mock: false });
   }
 
   const { searchParams } = new URL(request.url);
-  const dbId = searchParams.get('dbId') || DB_IDS.INSIGHTS;
+  const mapping = getDbMappingFromRequest(request);
+  const dbId = searchParams.get('dbId') || mapping.insights || DB_IDS.INSIGHTS;
 
   try {
-    const pages = await queryDatabase(dbId);
+    const pages = await queryDatabase(dbId, undefined, undefined, token);
     const data: Insight[] = pages.map(pageToInsight);
     return NextResponse.json({ data, mock: false });
   } catch (err) {
-    console.warn('[notion fallback]', err instanceof Error ? err.message : err);
-    return NextResponse.json({ data: MOCK_INSIGHTS, mock: true, fallback: true });
+    console.warn('[insights GET]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ data: [], mock: false, error: 'query failed' });
   }
 }

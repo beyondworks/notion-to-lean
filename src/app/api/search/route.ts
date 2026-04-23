@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { SearchResult } from '@/lib/types';
 import {
   isNotionEnabled,
+  getRequestApiKey,
   searchNotion,
   getPropertyValueMulti,
   pageUrl,
 } from '@/lib/notion';
-import { MOCK_TASKS, MOCK_FINANCE, MOCK_INSIGHTS, MOCK_WORKS } from '@/lib/mock-data';
 
 // ---------------------------------------------------------------------------
 // Icon mapping for Notion parent database
@@ -20,37 +20,6 @@ const DB_ICON_MAP: Record<string, { type: SearchResult['type']; icon: string }> 
 };
 
 // ---------------------------------------------------------------------------
-// Mock search: simple case-insensitive title match
-// ---------------------------------------------------------------------------
-function searchMock(q: string): SearchResult[] {
-  const lower = q.toLowerCase();
-  const results: SearchResult[] = [];
-
-  for (const t of MOCK_TASKS) {
-    if (t.title.toLowerCase().includes(lower)) {
-      results.push({ id: t.id, title: t.title, type: 'task', icon: 'CheckCircle2', url: '/tasks' });
-    }
-  }
-  for (const f of MOCK_FINANCE) {
-    if (f.client.toLowerCase().includes(lower)) {
-      results.push({ id: f.id, title: f.client, type: 'finance', icon: 'Banknote', url: '/finance' });
-    }
-  }
-  for (const i of MOCK_INSIGHTS) {
-    if (i.title.toLowerCase().includes(lower)) {
-      results.push({ id: i.id, title: i.title, type: 'insight', icon: 'Sparkles', url: '/insights' });
-    }
-  }
-  for (const w of MOCK_WORKS) {
-    if (w.title.toLowerCase().includes(lower)) {
-      results.push({ id: w.id, title: w.title, type: 'work', icon: 'Briefcase', url: '/works' });
-    }
-  }
-
-  return results;
-}
-
-// ---------------------------------------------------------------------------
 // GET /api/search?q=...
 // ---------------------------------------------------------------------------
 export async function GET(request: NextRequest) {
@@ -60,12 +29,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ results: [] });
   }
 
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ results: searchMock(q), mock: true });
+  const token = getRequestApiKey(request);
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ results: [], mock: false });
   }
 
   try {
-    const pages = await searchNotion(q);
+    const pages = await searchNotion(q, token);
     const qLower = q.toLowerCase();
 
     // Extract a title from any page by scanning all title-type properties

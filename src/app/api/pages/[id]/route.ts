@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   isNotionEnabled,
+  getRequestApiKey,
   getPage,
   updatePage,
   archivePage,
@@ -12,28 +13,18 @@ import {
 // GET /api/pages/[id] — Retrieve page properties + metadata
 // ---------------------------------------------------------------------------
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const token = getRequestApiKey(request);
 
-  if (!isNotionEnabled()) {
-    return NextResponse.json({
-      id,
-      title: '(Mock Page)',
-      cover: null,
-      icon: null,
-      properties: {},
-      blocks: [],
-      notionUrl: `https://notion.so/${id}`,
-      lastEditedAt: new Date().toISOString(),
-      lastEditedBy: 'mock',
-      mock: true,
-    });
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ error: 'Notion connection required' }, { status: 401 });
   }
 
   try {
-    const page = await getPage(id);
+    const page = await getPage(id, token);
     if (!page) {
       return NextResponse.json({ error: 'Page not found' }, { status: 404 });
     }
@@ -75,7 +66,7 @@ export async function GET(
 
     const dueProp =
       getPropertyValueMulti(page, ['Due', 'Date', '기한', '마감', 'Due Date'], 'date');
-    const dueDate = dueProp?.start ?? null;
+    const dueDate = typeof dueProp === 'string' ? dueProp : (dueProp?.start ?? null);
 
     // completed: null means "no checkbox property on this DB" — UI should not render checkbox
     const hasCompleted =
@@ -95,8 +86,15 @@ export async function GET(
       getPropertyValueMulti(page, ['Tags', 'Tag', '태그'], 'multi_select');
     const tags = Array.isArray(tagsProp) ? tagsProp.map((t: any) => t.name).filter(Boolean) : [];
 
+    const parent = page.parent ?? {};
+    const parentDbId =
+      parent.database_id ??
+      (parent.type === 'database_id' ? parent.database_id : null) ??
+      null;
+
     return NextResponse.json({
       id: page.id,
+      parentDbId,
       title: title || '(제목 없음)',
       cover,
       icon,
@@ -132,12 +130,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const token = getRequestApiKey(request);
 
   let body: {
     properties?: Record<string, unknown>;
     title?: string;
     completed?: boolean;
     status?: string;
+    archived?: boolean;
   };
   try {
     body = await request.json();
@@ -145,13 +145,18 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ success: true, mock: true });
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ error: 'Notion connection required' }, { status: 401 });
   }
 
   try {
+    if (body.archived === true) {
+      await archivePage(id, token);
+      return NextResponse.json({ success: true, mock: false });
+    }
+
     // Fetch current page to discover actual property names
-    const page = await getPage(id);
+    const page = await getPage(id, token);
     if (!page) {
       return NextResponse.json({ error: 'Page not found' }, { status: 404 });
     }
@@ -211,7 +216,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'No valid properties to update' }, { status: 400 });
     }
 
-    await updatePage(id, props);
+    await updatePage(id, props, token);
     return NextResponse.json({ success: true, mock: false });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -224,17 +229,18 @@ export async function PATCH(
 // DELETE /api/pages/[id] — Archive (soft-delete) a page
 // ---------------------------------------------------------------------------
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const token = getRequestApiKey(request);
 
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ success: true, mock: true });
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ error: 'Notion connection required' }, { status: 401 });
   }
 
   try {
-    await archivePage(id);
+    await archivePage(id, token);
     return NextResponse.json({ success: true, mock: false });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

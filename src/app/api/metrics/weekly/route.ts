@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
   isNotionEnabled,
+  getRequestApiKey,
   queryDatabase,
   getPropertyValueMulti,
   DB_IDS,
 } from '@/lib/notion';
-import { MOCK_TASKS } from '@/lib/mock-data';
+import { getDbMappingFromRequest } from '@/lib/notion-session';
 import type { Task } from '@/lib/types';
 
 interface WeeklyMetrics {
@@ -90,20 +91,23 @@ function pageToTaskWithEdit(page: any): Task & { lastEditedAt?: string | null } 
   } as Task & { lastEditedAt?: string | null };
 }
 
-export async function GET() {
-  if (!isNotionEnabled()) {
-    const metrics = computeMetrics(MOCK_TASKS as Array<Task & { lastEditedAt?: string | null }>);
-    return NextResponse.json({ data: metrics, mock: true });
+export async function GET(request: Request) {
+  const token = getRequestApiKey(request);
+  const { searchParams } = new URL(request.url);
+  const mapping = getDbMappingFromRequest(request);
+  const dbId = searchParams.get('dbId') || mapping.tasks || DB_IDS.TASKS;
+
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ data: computeMetrics([]), mock: false });
   }
 
   try {
-    const pages = await queryDatabase(DB_IDS.TASKS);
+    const pages = await queryDatabase(dbId, undefined, undefined, token);
     const tasks = pages.map(pageToTaskWithEdit);
     const metrics = computeMetrics(tasks);
     return NextResponse.json({ data: metrics, mock: false });
   } catch (err) {
-    console.warn('[metrics weekly fallback]', err instanceof Error ? err.message : err);
-    const metrics = computeMetrics(MOCK_TASKS as Array<Task & { lastEditedAt?: string | null }>);
-    return NextResponse.json({ data: metrics, mock: true, fallback: true });
+    console.warn('[metrics weekly]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ data: computeMetrics([]), mock: false, error: 'query failed' });
   }
 }

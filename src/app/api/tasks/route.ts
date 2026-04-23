@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { Task } from '@/lib/types';
 import {
   isNotionEnabled,
+  getRequestApiKey,
   queryDatabase,
   updatePage,
   createPage,
@@ -9,7 +10,7 @@ import {
   pageUrl,
   DB_IDS,
 } from '@/lib/notion';
-import { MOCK_TASKS } from '@/lib/mock-data';
+import { getDbMappingFromRequest } from '@/lib/notion-session';
 
 // ---------------------------------------------------------------------------
 // Notion color name -> CSS class-friendly color name
@@ -54,20 +55,25 @@ function pageToTask(page: any): Task {
 // ---------------------------------------------------------------------------
 // GET /api/tasks
 // ---------------------------------------------------------------------------
-export async function GET() {
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ data: MOCK_TASKS, mock: true });
+export async function GET(request: Request) {
+  const token = getRequestApiKey(request);
+  const { searchParams } = new URL(request.url);
+  const mapping = getDbMappingFromRequest(request);
+  const dbId = searchParams.get('dbId') || mapping.tasks || DB_IDS.TASKS;
+
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ data: [], mock: false });
   }
 
   try {
-    const pages = await queryDatabase(DB_IDS.TASKS, undefined, [
-      { property: 'Completed', direction: 'ascending' } as any,
-    ]);
+    const sortByCompleted =
+      dbId === DB_IDS.TASKS ? [{ property: 'Completed', direction: 'ascending' } as any] : undefined;
+    const pages = await queryDatabase(dbId, undefined, sortByCompleted, token);
     const data: Task[] = pages.map(pageToTask);
     return NextResponse.json({ data, mock: false });
   } catch (err) {
-    console.warn('[notion fallback]', err instanceof Error ? err.message : err);
-    return NextResponse.json({ data: MOCK_TASKS, mock: true, fallback: true });
+    console.warn('[tasks GET]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ data: [], mock: false, error: 'query failed' });
   }
 }
 
@@ -75,7 +81,8 @@ export async function GET() {
 // POST /api/tasks  — action: 'toggle' (default) | 'create'
 // ---------------------------------------------------------------------------
 export async function POST(request: Request) {
-  let body: { action?: string; id?: string; done?: boolean; title?: string; properties?: Record<string, unknown> };
+  const token = getRequestApiKey(request);
+  let body: { action?: string; id?: string; done?: boolean; title?: string; dbId?: string; properties?: Record<string, unknown> };
   try {
     body = await request.json();
   } catch {
@@ -83,6 +90,7 @@ export async function POST(request: Request) {
   }
 
   const action = body.action ?? 'toggle';
+  const mapping = getDbMappingFromRequest(request);
 
   // ---- CREATE ----
   if (action === 'create') {
@@ -90,12 +98,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'title is required for create action' }, { status: 400 });
     }
 
-    if (!isNotionEnabled()) {
-      const mockId = `mock-task-${Date.now()}`;
-      return NextResponse.json(
-        { id: mockId, url: `https://notion.so/${mockId}`, mock: true },
-        { status: 201 },
-      );
+    if (!isNotionEnabled(token)) {
+      return NextResponse.json({ error: 'Notion connection required' }, { status: 401 });
     }
 
     try {
@@ -104,7 +108,7 @@ export async function POST(request: Request) {
         Name: { title: [{ text: { content: body.title } }] },
       };
 
-      const pageId = await createPage(DB_IDS.TASKS, properties);
+      const pageId = await createPage(body.dbId || mapping.tasks || DB_IDS.TASKS, properties, token);
       if (!pageId) {
         return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
       }
@@ -128,8 +132,8 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isNotionEnabled()) {
-    return NextResponse.json({ success: true, mock: true });
+  if (!isNotionEnabled(token)) {
+    return NextResponse.json({ error: 'Notion connection required' }, { status: 401 });
   }
 
   try {
@@ -139,7 +143,7 @@ export async function POST(request: Request) {
 
     for (const name of propertyNames) {
       try {
-        await updatePage(body.id, { [name]: { checkbox: body.done } });
+        await updatePage(body.id, { [name]: { checkbox: body.done } }, token);
         updated = true;
         break;
       } catch {
@@ -156,7 +160,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, mock: false });
   } catch (err) {
-    console.warn('[notion fallback]', err instanceof Error ? err.message : err);
-    return NextResponse.json({ data: MOCK_TASKS, mock: true, fallback: true });
+    console.warn('[tasks POST]', err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   }
 }
