@@ -4,8 +4,10 @@ import { getDbMappingFromRequest, getNotionSessionFromRequest } from '@/lib/noti
 
 export async function GET(request: Request) {
   const session = getNotionSessionFromRequest(request);
+  const hasInternalKey = Boolean(process.env.NOTION_API_KEY);
   return NextResponse.json({
     connected: Boolean(session?.accessToken),
+    internalKeyConfigured: hasInternalKey,
     oauthConfigured: notionOAuthConfigured(),
     profile: session
       ? {

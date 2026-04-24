@@ -133,9 +133,9 @@
   /* ── Mobile: strip desktop-preview chrome ────────────── */
   @media (max-width: 500px) {
     body { overflow: hidden; }
-    .stage { padding: 0; gap: 0; min-height: var(--nm-app-height, 100dvh); width: 100vw; min-width: 100vw; }
+    .stage { padding: 0; gap: 0; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); width: 100vw; min-width: 100vw; align-items: stretch; justify-content: flex-start; }
     .stage-label, .toolbar, .screen-picker { display: none !important; }
-    #phone-root { width: 100vw; height: var(--nm-app-height, 100dvh); }
+    #phone-root { width: 100vw; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); }
   }
 </style>
 </head>

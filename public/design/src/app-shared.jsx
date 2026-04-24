@@ -186,6 +186,17 @@ window.nmRefreshSession = async function nmRefreshSession() {
     if (!res.ok) return null;
     const json = await res.json();
     localStorage.setItem("nm-oauth-configured", json.oauthConfigured ? "1" : "0");
+    // Auto-detect owner mode: server has NOTION_API_KEY but no OAuth session
+    if (!json.connected && json.internalKeyConfigured) {
+      const currentMode = localStorage.getItem("nm-connection-mode");
+      if (!currentMode || currentMode === "demo") {
+        localStorage.setItem("nm-connection-mode", "owner");
+        localStorage.setItem("nm-onboarded", "1");
+        window.nmInvalidate && window.nmInvalidate();
+        window.dispatchEvent(new CustomEvent("nm-connection-update", { detail: { mode: "owner" } }));
+      }
+      return json;
+    }
     if (json.connected) {
       const previousMode = localStorage.getItem("nm-connection-mode");
       const previousWorkspace = localStorage.getItem("nm-workspace-key");
@@ -633,11 +644,11 @@ function ActionSheet({ open, title, subtitle, onClose, children }) {
         className="glass"
         style={{
           position: "absolute", left: 10, right: 10,
-          bottom: "calc(10px + var(--safe-b, env(safe-area-inset-bottom, 0px)) + var(--nm-keyboard-bottom, 0px))",
+          bottom: "calc(10px + var(--safe-b, env(safe-area-inset-bottom, 0px)))",
           zIndex: 81,
           borderRadius: 24, padding: "8px 0 12px",
           overflow: "hidden",
-          maxHeight: "calc(78dvh - var(--nm-keyboard-bottom, 0px))",
+          maxHeight: "calc(var(--nm-app-height, 100dvh) - var(--safe-b, 0px) - 80px)",
           display: "flex", flexDirection: "column",
         }}
       >
