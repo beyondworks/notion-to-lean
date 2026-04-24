@@ -186,10 +186,11 @@ window.nmRefreshSession = async function nmRefreshSession() {
     if (!res.ok) return null;
     const json = await res.json();
     localStorage.setItem("nm-oauth-configured", json.oauthConfigured ? "1" : "0");
-    // Auto-detect owner mode: server has NOTION_API_KEY but no OAuth session
+    // Auto-detect owner mode: server has NOTION_API_KEY but no OAuth session.
+    // Covers: fresh "demo", stale "oauth" (expired cookie), or unset mode.
     if (!json.connected && json.internalKeyConfigured) {
       const currentMode = localStorage.getItem("nm-connection-mode");
-      if (!currentMode || currentMode === "demo") {
+      if (!currentMode || currentMode === "demo" || currentMode === "oauth") {
         localStorage.setItem("nm-connection-mode", "owner");
         localStorage.setItem("nm-onboarded", "1");
         window.nmInvalidate && window.nmInvalidate();
