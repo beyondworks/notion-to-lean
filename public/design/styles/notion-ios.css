@@ -180,7 +180,7 @@ html, body {
     --nm-app-height: 100lvh;
     --nm-nav-top: max(44px, calc(var(--safe-t) + 12px));
     --nm-tabbar-height: 62px;
-    --nm-tabbar-bottom: 8px;
+    --nm-tabbar-bottom: calc(8px - var(--safe-b));
     --nm-tabbar-space: calc(var(--nm-tabbar-height) + var(--nm-tabbar-bottom) + 24px);
     --nm-composer-bottom: calc(var(--nm-tabbar-height) + var(--nm-tabbar-bottom) + 14px);
   }
@@ -376,7 +376,7 @@ html[data-keyboard-open] .tabbar {
   }
 
   .tabbar {
-    position: absolute;
+    position: fixed;
     left: 12px;
     right: 12px;
     bottom: var(--nm-tabbar-bottom);

@@ -38,6 +38,7 @@
     const visualHeight = vv ? vv.height : window.innerHeight;
     const isMobile = window.matchMedia("(max-width: 500px)").matches;
     const isStandalone = Boolean(window.navigator.standalone) || window.matchMedia("(display-mode: standalone)").matches;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const layoutHeight = Math.max(
       window.innerHeight || 0,
       document.documentElement.clientHeight || 0
@@ -48,8 +49,8 @@
     const height = keyboard > 80 ? `${Math.max(320, visualHeight)}px` : fullViewport;
     document.documentElement.style.setProperty("--nm-app-height", height);
     document.documentElement.style.setProperty("--nm-keyboard-bottom", `${keyboard}px`);
-    document.documentElement.style.setProperty("--nm-safe-t-fallback", isMobile && isStandalone ? "44px" : "0px");
-    document.documentElement.style.setProperty("--nm-safe-b-fallback", "0px");
+    document.documentElement.style.setProperty("--nm-safe-t-fallback", isMobile && isStandalone && isIOS ? "44px" : "0px");
+    document.documentElement.style.setProperty("--nm-safe-b-fallback", isMobile && isStandalone && isIOS ? "34px" : "0px");
     document.documentElement.toggleAttribute("data-standalone-pwa", isMobile && isStandalone);
     document.documentElement.toggleAttribute("data-keyboard-open", keyboard > 80);
     window.nmRenderViewportDebug?.();
