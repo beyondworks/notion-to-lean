@@ -633,17 +633,14 @@ function TabBar({ active = 0, onChange }) {
     { icon: "person", label: t("나") },
   ];
   return (
-    <>
-      <div className="tabbar-backdrop" aria-hidden="true" />
-      <div className="tabbar glass">
-        {items.map((it, i) => (
-          <div key={i} className={"tab-item" + (active === i ? " on" : "")} onClick={() => onChange && onChange(i)}>
-            <Icon name={it.icon} size={22}/>
-            <span>{it.label}</span>
-          </div>
-        ))}
-      </div>
-    </>
+    <div className="tabbar glass">
+      {items.map((it, i) => (
+        <div key={i} className={"tab-item" + (active === i ? " on" : "")} onClick={() => onChange && onChange(i)}>
+          <Icon name={it.icon} size={22}/>
+          <span>{it.label}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

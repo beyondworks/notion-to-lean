@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nolio-pwa-v27-20260426-visual-viewport-height";
+const CACHE_VERSION = "nolio-pwa-v28-20260426-fullscreen-root";
 const APP_SHELL = [
   "/manifest.json",
   "/offline.html",

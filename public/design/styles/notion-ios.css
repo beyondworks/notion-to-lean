@@ -177,7 +177,7 @@ html, body {
 
 @media (max-width: 500px) {
   :root {
-    --nm-app-height: 100dvh;
+    --nm-app-height: 100lvh;
     --nm-nav-top: max(44px, calc(var(--safe-t) + 12px));
     --nm-tabbar-height: 62px;
     --nm-tabbar-bottom: 8px;
@@ -333,21 +333,6 @@ html, body {
 .fab:active { transform: scale(0.92); }
 
 /* Tab bar (liquid glass bottom dock) */
-.tabbar-backdrop {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: calc(var(--nm-tabbar-height) + var(--nm-tabbar-bottom) + 26px);
-  z-index: 2147482990;
-  pointer-events: none;
-  background: linear-gradient(to top, #F7F6F3 0%, #F7F6F3 58%, rgba(247, 246, 243, 0) 100%);
-}
-
-[data-theme="dark"] .tabbar-backdrop {
-  background: linear-gradient(to top, #111111 0%, #111111 58%, rgba(17, 17, 17, 0) 100%);
-}
-
 .tabbar {
   position: absolute;
   left: 12px;
@@ -362,7 +347,6 @@ html, body {
   pointer-events: auto;
 }
 
-html[data-keyboard-open] .tabbar-backdrop,
 html[data-keyboard-open] .tabbar {
   display: none;
 }
@@ -384,9 +368,11 @@ html[data-keyboard-open] .tabbar {
     position: fixed !important;
     inset: 0 !important;
     width: 100dvw !important;
-    height: var(--nm-app-height, 100dvh) !important;
-    min-height: var(--nm-app-height, 100dvh) !important;
-    max-height: var(--nm-app-height, 100dvh) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
   }
 
   .tabbar {

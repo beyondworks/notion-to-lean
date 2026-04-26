@@ -44,7 +44,7 @@
     );
     const keyboard = Math.max(0, layoutHeight - visualHeight - offsetTop);
     const viewportHeight = Math.max(320, visualHeight + offsetTop || layoutHeight);
-    const fullViewport = isMobile ? `${Math.ceil(viewportHeight)}px` : "100dvh";
+    const fullViewport = isMobile ? "100lvh" : "100dvh";
     const height = keyboard > 80 ? `${Math.max(320, visualHeight)}px` : fullViewport;
     document.documentElement.style.setProperty("--nm-app-height", height);
     document.documentElement.style.setProperty("--nm-keyboard-bottom", `${keyboard}px`);
@@ -237,11 +237,11 @@
 
   /* ── Mobile: strip desktop-preview chrome ────────────── */
   @media (max-width: 500px) {
-    html, body { position: fixed; inset: 0; width: 100dvw; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); background: var(--n-bg-grouped); overflow: hidden; overscroll-behavior: none; }
+    html, body { position: fixed; inset: 0; width: 100dvw; height: 100lvh; min-height: 100lvh; background: var(--n-bg-grouped); overflow: hidden; overscroll-behavior: none; }
     [data-theme="dark"] html, [data-theme="dark"] body { background: var(--n-bg-grouped); }
-    .stage { position: fixed; inset: 0; padding: 0; gap: 0; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); width: 100dvw; min-width: 100dvw; align-items: stretch; justify-content: flex-start; background: var(--n-bg-grouped); overflow: hidden; }
+    .stage { position: fixed; inset: 0; padding: 0; gap: 0; height: auto; min-height: 0; width: 100dvw; min-width: 100dvw; align-items: stretch; justify-content: flex-start; background: var(--n-bg-grouped); overflow: hidden; }
     .stage-label, .toolbar, .screen-picker { display: none !important; }
-    #phone-root { position: fixed; inset: 0; width: 100dvw; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); background: var(--n-bg-grouped); overflow: hidden; }
+    #phone-root { position: fixed; inset: 0; width: 100dvw; height: auto; min-height: 0; background: var(--n-bg-grouped); overflow: hidden; }
   }
 </style>
 </head>
