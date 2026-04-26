@@ -373,7 +373,7 @@ html[data-keyboard-open] .tabbar {
   }
 
   .tabbar {
-    position: fixed;
+    position: absolute;
     left: 12px;
     right: 12px;
     bottom: var(--nm-tabbar-bottom);
@@ -401,7 +401,7 @@ html[data-keyboard-open] .tabbar {
 
 @media (max-width: 500px) {
   .page-composer {
-    position: fixed;
+    position: absolute;
     left: 14px;
     right: 14px;
     bottom: var(--nm-composer-bottom);
