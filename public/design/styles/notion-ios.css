@@ -347,6 +347,10 @@ html, body {
   pointer-events: auto;
 }
 
+.nm-bottom-safe-cover {
+  display: none;
+}
+
 html[data-keyboard-open] .tabbar {
   display: none;
 }
@@ -367,6 +371,7 @@ html[data-keyboard-open] .tabbar {
   .phone[data-is-mobile="1"] {
     position: fixed !important;
     inset: 0 !important;
+    z-index: 2147483000;
     width: 100dvw !important;
     height: var(--nm-app-height, 100dvh) !important;
     min-height: var(--nm-app-height, 100dvh) !important;
@@ -384,9 +389,22 @@ html[data-keyboard-open] .tabbar {
     border-radius: 22px;
     align-items: center;
     padding: 0 6px;
-    z-index: 2147483000;
+    z-index: 2147483002;
     transform: translateZ(0);
     box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 10px 28px rgba(0,0,0,0.10);
+  }
+
+  .nm-bottom-safe-cover {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: max(44px, calc(var(--safe-b) + 18px));
+    background: var(--n-bg-grouped);
+    z-index: 2147482990;
+    pointer-events: none;
+    transform: translateZ(0);
   }
 
   .tab-item {

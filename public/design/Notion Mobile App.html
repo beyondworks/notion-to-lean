@@ -65,6 +65,7 @@
     const vv = window.visualViewport;
     const tab = document.querySelector(".tabbar")?.getBoundingClientRect();
     const phone = document.querySelector(".phone")?.getBoundingClientRect();
+    const bottomCover = document.querySelector(".nm-bottom-safe-cover")?.getBoundingClientRect();
     const rootStyle = getComputedStyle(document.documentElement);
     return {
       href: location.href,
@@ -80,6 +81,7 @@
       keyboard: rootStyle.getPropertyValue("--nm-keyboard-bottom").trim(),
       phone: phone ? [Math.round(phone.top), Math.round(phone.bottom), Math.round(phone.height)] : null,
       tabbar: tab ? [Math.round(tab.top), Math.round(tab.bottom), Math.round(tab.height)] : null,
+      bottomCover: bottomCover ? [Math.round(bottomCover.top), Math.round(bottomCover.bottom), Math.round(bottomCover.height)] : null,
     };
   }
 
@@ -247,7 +249,7 @@
     [data-theme="dark"] html, [data-theme="dark"] body { background: var(--n-bg-grouped); }
     .stage { position: fixed; inset: 0; padding: 0; gap: 0; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); width: 100dvw; min-width: 100dvw; align-items: stretch; justify-content: flex-start; background: var(--n-bg-grouped); overflow: hidden; }
     .stage-label, .toolbar, .screen-picker { display: none !important; }
-    #phone-root { position: fixed; inset: 0; width: 100dvw; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); background: var(--n-bg-grouped); overflow: hidden; }
+    #phone-root { position: fixed; inset: 0; z-index: 2147483000; width: 100dvw; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); background: var(--n-bg-grouped); overflow: hidden; }
   }
 </style>
 </head>
@@ -267,6 +269,7 @@
 <div class="stage">
   <div id="phone-root"></div>
 </div>
+<div class="nm-bottom-safe-cover" aria-hidden="true"></div>
 
 <div class="screen-picker" id="screen-picker"></div>
 
