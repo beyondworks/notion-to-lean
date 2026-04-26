@@ -40,15 +40,10 @@
     const isStandalone = Boolean(window.navigator.standalone) || window.matchMedia("(display-mode: standalone)").matches;
     const layoutHeight = Math.max(
       window.innerHeight || 0,
-      document.documentElement.clientHeight || 0,
-      visualHeight + offsetTop
+      document.documentElement.clientHeight || 0
     );
     const keyboard = Math.max(0, layoutHeight - visualHeight - offsetTop);
-    const rawScreenHeight = Math.max(window.screen?.width || 0, window.screen?.height || 0);
-    const screenCssHeight = isMobile && isStandalone && rawScreenHeight
-      ? (rawScreenHeight > 1200 && window.devicePixelRatio > 1 ? rawScreenHeight / window.devicePixelRatio : rawScreenHeight)
-      : 0;
-    const viewportHeight = Math.max(layoutHeight, visualHeight + offsetTop, screenCssHeight);
+    const viewportHeight = Math.max(320, visualHeight + offsetTop || layoutHeight);
     const fullViewport = isMobile ? `${Math.ceil(viewportHeight)}px` : "100dvh";
     const height = keyboard > 80 ? `${Math.max(320, visualHeight)}px` : fullViewport;
     document.documentElement.style.setProperty("--nm-app-height", height);
@@ -73,10 +68,6 @@
       client: [document.documentElement.clientWidth, document.documentElement.clientHeight],
       visual: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round(vv.offsetTop)] : null,
       screen: [window.screen.width, window.screen.height],
-      screenCssHeight: (() => {
-        const raw = Math.max(window.screen?.width || 0, window.screen?.height || 0);
-        return raw > 1200 && window.devicePixelRatio > 1 ? Math.round(raw / window.devicePixelRatio) : raw;
-      })(),
       appHeight: rootStyle.getPropertyValue("--nm-app-height").trim(),
       safeTop: rootStyle.getPropertyValue("--safe-t").trim(),
       safeBottom: rootStyle.getPropertyValue("--safe-b").trim(),

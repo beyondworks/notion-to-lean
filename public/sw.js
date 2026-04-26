@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nolio-pwa-v26-20260426-tabbar-zlayer";
+const CACHE_VERSION = "nolio-pwa-v27-20260426-visual-viewport-height";
 const APP_SHELL = [
   "/manifest.json",
   "/offline.html",
