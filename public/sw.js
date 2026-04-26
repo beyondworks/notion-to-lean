@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nolio-pwa-v21-20260426";
+const CACHE_VERSION = "nolio-pwa-v22-20260426";
 const APP_SHELL = [
   "/manifest.json",
   "/offline.html",

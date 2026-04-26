@@ -269,6 +269,14 @@ function formatGenericDate(value) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function FilterChip({ active, onClick, children }) {
+  return (
+    <button type="button" onClick={onClick} className={`filter-chip${active ? " is-selected" : ""}`}>
+      {children}
+    </button>
+  );
+}
+
 function DbListScreen({ go, goBack, ctx }) {
   const dbKey = ctx?.dbKey;
   const subDbId = ctx?.dbId || null;
@@ -487,8 +495,21 @@ function DbListScreen({ go, goBack, ctx }) {
   const genericTableColumns = usesGenericDb ? dbSchema.filter(p => p.type !== "title").slice(0, 5) : [];
   const genericBoardProp = usesGenericDb ? dbProfile.primaryBoard : null;
   const genericSortProps = usesGenericDb
-    ? dbSchema.filter(p => ["title", "date", "number", "select", "status", "checkbox"].includes(p.type)).slice(0, 8)
+    ? dbSchema.filter(p => ["date", "number", "select", "status", "checkbox"].includes(p.type)).slice(0, 8)
     : [];
+  const activePropSort = String(dbFilter.sort || "").startsWith("prop:")
+    ? (() => {
+        const parts = String(dbFilter.sort).split(":");
+        return { name: decodeURIComponent(parts[1] || ""), dir: parts[2] === "desc" ? "desc" : "asc" };
+      })()
+    : { name: "", dir: "asc" };
+  const setPropSort = (name, dir = activePropSort.dir || "asc") => {
+    if (!name) {
+      updateDbFilter({ sort: usesGenericDb ? "notion_view" : "edited_desc" });
+      return;
+    }
+    updateDbFilter({ sort: `prop:${encodeURIComponent(name)}:${dir}` });
+  };
   const genericBoardGroups = React.useMemo(() => {
     if (!usesGenericDb || !genericBoardProp) return [];
     const groups = {};
@@ -1036,91 +1057,86 @@ function DbListScreen({ go, goBack, ctx }) {
       <TabBar active={0} onChange={i => { if (i === 0) go("home"); else if (i === 1) go("search"); else if (i === 2) go("event-edit"); else if (i === 3) go("inbox"); else if (i === 4) go("settings"); }}/>
 
       <ActionSheet open={filterOpen} title="필터와 정렬" subtitle={effectiveTitle} onClose={() => setFilterOpen(false)}>
-        <div style={{padding: "0 18px 10px"}}>
+        <div className="filter-section">
           <div className="t-caption" style={{marginBottom: 8}}>정렬</div>
-          <div style={{display: "grid", gap: 6}}>
+          <div className="filter-chip-row">
             {[
-              ...(usesGenericDb ? [["notion_view", "Notion 뷰 순서"]] : []),
-              ["edited_desc", "최근 수정 먼저"],
-              ["edited_asc", "오래된 수정 먼저"],
+              ...(usesGenericDb ? [["notion_view", "Notion 순서"]] : []),
+              ["edited_desc", "최근 수정"],
+              ["edited_asc", "오래된 수정"],
               ["title_asc", "제목 A-Z"],
               ["title_desc", "제목 Z-A"],
-              ...genericSortProps.flatMap(prop => {
-                if (prop.type === "title") return [];
-                const key = encodeURIComponent(prop.name);
-                const suffix = prop.type === "date" ? "날짜" : prop.type === "number" ? "숫자" : "속성";
-                return [
-                  [`prop:${key}:asc`, `${prop.name} ${suffix} 오름차순`],
-                  [`prop:${key}:desc`, `${prop.name} ${suffix} 내림차순`],
-                ];
-              }),
             ].map(([k, label]) => (
-              <button key={k} onClick={() => updateDbFilter({sort: k})} style={{
-                border: "none", borderRadius: 12, padding: "10px 12px", textAlign: "left",
-                background: dbFilter.sort === k ? "var(--n-accent)" : "var(--n-surface)",
-                color: dbFilter.sort === k ? "var(--n-bg)" : "var(--n-text)",
-                fontWeight: 600, cursor: "pointer",
-              }}>{label}</button>
+              <FilterChip key={k} active={dbFilter.sort === k} onClick={() => updateDbFilter({sort: k})}>
+                {label}
+              </FilterChip>
             ))}
           </div>
+          {usesGenericDb && genericSortProps.length > 0 && (
+            <div style={{display: "grid", gridTemplateColumns: "1fr auto", gap: 8, marginTop: 10, alignItems: "center"}}>
+              <select
+                className="filter-select"
+                value={activePropSort.name}
+                onChange={e => setPropSort(e.target.value, activePropSort.dir)}
+                aria-label="속성 기준 정렬"
+              >
+                <option value="">속성 기준 정렬 안 함</option>
+                {genericSortProps.map(prop => <option key={prop.name} value={prop.name}>{prop.name}</option>)}
+              </select>
+              <div className="filter-chip-row" style={{gap: 6}}>
+                <FilterChip active={!!activePropSort.name && activePropSort.dir === "asc"} onClick={() => activePropSort.name && setPropSort(activePropSort.name, "asc")}>↑</FilterChip>
+                <FilterChip active={!!activePropSort.name && activePropSort.dir === "desc"} onClick={() => activePropSort.name && setPropSort(activePropSort.name, "desc")}>↓</FilterChip>
+              </div>
+            </div>
+          )}
         </div>
         {isTasks && (
-          <div style={{padding: "4px 18px 10px"}}>
+          <div className="filter-section">
             <div className="t-caption" style={{marginBottom: 8}}>완료 상태</div>
-            <div style={{display: "flex", gap: 6}}>
+            <div className="filter-chip-row">
               {[
                 ["all", "전체"],
                 ["open", "미완료"],
                 ["done", "완료"],
               ].map(([k, label]) => (
-                <button key={k} onClick={() => updateDbFilter({taskStatus: k})} style={{
-                  flex: 1, border: "none", borderRadius: 12, padding: "10px 8px",
-                  background: dbFilter.taskStatus === k ? "var(--n-accent)" : "var(--n-surface)",
-                  color: dbFilter.taskStatus === k ? "var(--n-bg)" : "var(--n-text)",
-                  fontWeight: 600, cursor: "pointer",
-                }}>{label}</button>
+                <FilterChip key={k} active={dbFilter.taskStatus === k} onClick={() => updateDbFilter({taskStatus: k})}>
+                  {label}
+                </FilterChip>
               ))}
             </div>
           </div>
         )}
         {usesGenericDb && genericFilterProps.length > 0 && (
-          <div style={{padding: "4px 18px 10px"}}>
+          <div className="filter-section">
             <div className="t-caption" style={{marginBottom: 8}}>속성 필터</div>
-            <div style={{display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6}} className="hide-scroll">
-              {genericFilterProps.map(prop => (
-                <button key={prop.name} onClick={() => updateDbFilter({propertyName: prop.name, propertyValue: ""})} style={{
-                  flexShrink: 0, border: "none", borderRadius: 16, padding: "8px 12px",
-                  background: dbFilter.propertyName === prop.name ? "var(--n-accent)" : "var(--n-surface)",
-                  color: dbFilter.propertyName === prop.name ? "var(--n-bg)" : "var(--n-text)",
-                  fontWeight: 600, cursor: "pointer",
-                }}>{prop.name}</button>
-              ))}
-            </div>
+            <select
+              className="filter-select"
+              value={dbFilter.propertyName || ""}
+              onChange={e => updateDbFilter({propertyName: e.target.value, propertyValue: ""})}
+              aria-label="필터할 속성"
+            >
+              <option value="">속성 필터 없음</option>
+              {genericFilterProps.map(prop => <option key={prop.name} value={prop.name}>{prop.name}</option>)}
+            </select>
             {activeGenericFilter && (
-              <div style={{display: "flex", gap: 6, overflowX: "auto"}} className="hide-scroll">
+              <div className="filter-chip-row" style={{marginTop: 10}}>
                 {[{name: "", label: "전체"}, ...genericFilterOptions].map(opt => (
-                  <button key={opt.name || "all"} onClick={() => updateDbFilter({propertyValue: opt.name})} style={{
-                    flexShrink: 0, border: "none", borderRadius: 16, padding: "8px 12px",
-                    background: dbFilter.propertyValue === opt.name ? "var(--n-accent)" : "var(--n-surface)",
-                    color: dbFilter.propertyValue === opt.name ? "var(--n-bg)" : "var(--n-text)",
-                    fontWeight: 600, cursor: "pointer",
-                  }}>{opt.label}</button>
+                  <FilterChip key={opt.name || "all"} active={dbFilter.propertyValue === opt.name} onClick={() => updateDbFilter({propertyValue: opt.name})}>
+                    {opt.label}
+                  </FilterChip>
                 ))}
               </div>
             )}
           </div>
         )}
         {!isTasks && categoryOptions.length > 0 && (
-          <div style={{padding: "4px 18px 10px"}}>
+          <div className="filter-section">
             <div className="t-caption" style={{marginBottom: 8}}>카테고리</div>
-            <div style={{display: "flex", gap: 6, overflowX: "auto"}} className="hide-scroll">
+            <div className="filter-chip-row">
               {[["", "전체"], ...categoryOptions.map(c => [c, c])].map(([k, label]) => (
-                <button key={k || "all"} onClick={() => updateDbFilter({category: k})} style={{
-                  flexShrink: 0, border: "none", borderRadius: 16, padding: "8px 12px",
-                  background: dbFilter.category === k ? "var(--n-accent)" : "var(--n-surface)",
-                  color: dbFilter.category === k ? "var(--n-bg)" : "var(--n-text)",
-                  fontWeight: 600, cursor: "pointer",
-                }}>{label}</button>
+                <FilterChip key={k || "all"} active={dbFilter.category === k} onClick={() => updateDbFilter({category: k})}>
+                  {label}
+                </FilterChip>
               ))}
             </div>
           </div>

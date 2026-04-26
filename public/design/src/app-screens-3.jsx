@@ -1201,29 +1201,22 @@ function GenericPropertyField({ prop, value, onChange }) {
   if (prop.type === "status" || prop.type === "select") {
     return (
       <div className="g-row" style={{flexDirection: "column", alignItems: "stretch", gap: 8}}>
-        <div style={{display: "flex", alignItems: "center", gap: 10}}>
+        <div className="property-field-head">
           <Icon name="tag" size={18} color="var(--n-text-muted)"/>
-          <div className="t-body" style={{fontWeight: 500}}>{name}</div>
+          <div className="t-body property-field-title">{name}</div>
+          {value && <div className="t-footnote muted">{value}</div>}
         </div>
-        <div className="hide-scroll" style={{display: "flex", gap: 6, overflowX: "auto", paddingLeft: 28}}>
+        <div className="property-option-row">
           <button
             onClick={() => onChange("")}
-            style={{
-              flexShrink: 0, border: "none", borderRadius: 15, padding: "6px 10px",
-              background: !value ? "var(--n-text)" : "var(--n-surface-hover)",
-              color: !value ? "var(--n-bg)" : "var(--n-text-muted)",
-              fontSize: 12, fontWeight: 600,
-            }}>없음</button>
+            className={`property-chip${!value ? " is-selected" : ""}`}
+          >없음</button>
           {options.map(opt => (
             <button
               key={opt.id || opt.name}
               onClick={() => onChange(opt.name)}
-              style={{
-                flexShrink: 0, border: "none", borderRadius: 15, padding: "6px 10px",
-                background: value === opt.name ? "var(--n-text)" : "var(--n-surface-hover)",
-                color: value === opt.name ? "var(--n-bg)" : "var(--n-text)",
-                fontSize: 12, fontWeight: 600,
-              }}>{opt.name}</button>
+              className={`property-chip${value === opt.name ? " is-selected" : ""}`}
+            >{opt.name}</button>
           ))}
         </div>
       </div>
@@ -1234,23 +1227,20 @@ function GenericPropertyField({ prop, value, onChange }) {
     const selected = Array.isArray(value) ? value : [];
     return (
       <div className="g-row" style={{flexDirection: "column", alignItems: "stretch", gap: 8}}>
-        <div style={{display: "flex", alignItems: "center", gap: 10}}>
+        <div className="property-field-head">
           <Icon name="tag" size={18} color="var(--n-text-muted)"/>
-          <div className="t-body" style={{fontWeight: 500}}>{name}</div>
+          <div className="t-body property-field-title">{name}</div>
+          <div className="t-footnote muted">{selected.length}개</div>
         </div>
-        <div className="hide-scroll" style={{display: "flex", gap: 6, overflowX: "auto", paddingLeft: 28}}>
+        <div className="property-option-row">
           {options.map(opt => {
             const on = selected.includes(opt.name);
             return (
               <button
                 key={opt.id || opt.name}
                 onClick={() => onChange(on ? selected.filter(v => v !== opt.name) : [...selected, opt.name])}
-                style={{
-                  flexShrink: 0, border: "none", borderRadius: 15, padding: "6px 10px",
-                  background: on ? "var(--n-text)" : "var(--n-surface-hover)",
-                  color: on ? "var(--n-bg)" : "var(--n-text)",
-                  fontSize: 12, fontWeight: 600,
-                }}>{opt.name}</button>
+                className={`property-chip${on ? " is-selected" : ""}`}
+              >{opt.name}</button>
             );
           })}
         </div>
@@ -1270,15 +1260,18 @@ function GenericPropertyField({ prop, value, onChange }) {
       );
     }
 
-    const visibleOptions = relationOptions.filter(item => item?.id && !selected.includes(item.id));
+    const shouldShowRelationOptions = selected.length === 0 || !!relationQuery.trim();
+    const visibleOptions = shouldShowRelationOptions
+      ? relationOptions.filter(item => item?.id && !selected.includes(item.id)).slice(0, 12)
+      : [];
     const selectedRows = selected.map(id => relationKnown[id] || relationOptions.find(item => item.id === id) || {id, title: "연결됨"});
     const hasQuery = !!relationQuery.trim();
 
     return (
       <div className="g-row" style={{flexDirection: "column", alignItems: "stretch", gap: 10}}>
-        <div style={{display: "flex", alignItems: "center", gap: 10}}>
+        <div className="property-field-head">
           <Icon name="database" size={18} color="var(--n-text-muted)"/>
-          <div className="t-body" style={{fontWeight: 500}}>{name}</div>
+          <div className="t-body property-field-title">{name}</div>
           <div className="t-footnote muted" style={{marginLeft: "auto"}}>
             {relationLoading ? "불러오는 중" : `${selected.length}개 선택`}
           </div>
@@ -1335,7 +1328,7 @@ function GenericPropertyField({ prop, value, onChange }) {
           </div>
         )}
 
-        <div className="property-chip-row" style={{maxHeight: 168, overflowY: "auto"}}>
+        <div className="property-chip-row" style={{maxHeight: 136, overflowY: "auto"}}>
           {visibleOptions.length ? visibleOptions.map(item => (
             <button
               key={item.id}
@@ -1367,7 +1360,7 @@ function GenericPropertyField({ prop, value, onChange }) {
             </button>
           )) : (
             <div className="t-footnote muted" style={{padding: "10px 0 4px", textAlign: "left"}}>
-              {relationLoading ? "연결할 페이지를 불러오는 중..." : hasQuery ? "검색 결과 없음" : "연결할 페이지 없음"}
+              {relationLoading ? "연결할 페이지를 불러오는 중..." : hasQuery ? "검색 결과 없음" : selected.length ? "검색해서 더 연결" : "연결할 페이지 없음"}
             </div>
           )}
         </div>

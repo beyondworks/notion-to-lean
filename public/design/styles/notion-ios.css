@@ -440,6 +440,78 @@ html[data-keyboard-open] .tabbar {
   color: var(--n-bg);
 }
 
+.filter-section {
+  padding: 4px 18px 14px;
+}
+
+.filter-section + .filter-section {
+  border-top: 0.5px solid var(--n-border);
+  padding-top: 14px;
+}
+
+.filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-chip {
+  border: none;
+  border-radius: 999px;
+  padding: 9px 12px;
+  background: var(--n-surface);
+  color: var(--n-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.15;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.filter-chip.is-selected {
+  background: var(--n-accent);
+  color: var(--n-bg);
+}
+
+.filter-select {
+  width: 100%;
+  min-height: 42px;
+  border: none;
+  border-radius: 14px;
+  background: var(--n-surface);
+  color: var(--n-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  padding: 0 12px;
+  outline: none;
+}
+
+.property-field-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.property-field-title {
+  min-width: 0;
+  flex: 1;
+  font-weight: 650;
+}
+
+.property-option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 28px;
+  max-height: 128px;
+  overflow-y: auto;
+}
+
 /* Input */
 .input {
   width: 100%;
