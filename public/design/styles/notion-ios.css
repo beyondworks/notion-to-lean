@@ -107,9 +107,10 @@
   --nm-keyboard-bottom: 0px;
   --nm-app-height: 100dvh;
   --nm-nav-top: 54px;
+  --nm-tabbar-height: 62px;
   --nm-tabbar-bottom: calc(12px + var(--safe-b));
-  --nm-tabbar-space: calc(86px + var(--nm-tabbar-bottom));
-  --nm-composer-bottom: calc(var(--nm-tabbar-bottom) + 72px);
+  --nm-tabbar-space: calc(var(--nm-tabbar-height) + var(--nm-tabbar-bottom) + 22px);
+  --nm-composer-bottom: calc(var(--nm-tabbar-height) + var(--nm-tabbar-bottom) + 12px);
 }
 
 /* ── Dark mode ────────────────────────────────────────── */
@@ -176,11 +177,12 @@ html, body {
 
 @media (max-width: 500px) {
   :root {
-    --nm-app-height: 100lvh;
+    --nm-app-height: 100dvh;
     --nm-nav-top: max(44px, calc(var(--safe-t) + 12px));
-    --nm-tabbar-bottom: 8px;
-    --nm-tabbar-space: 112px;
-    --nm-composer-bottom: 78px;
+    --nm-tabbar-height: 62px;
+    --nm-tabbar-bottom: max(8px, calc(var(--safe-b) - 28px));
+    --nm-tabbar-space: calc(var(--nm-tabbar-height) + var(--nm-tabbar-bottom) + 24px);
+    --nm-composer-bottom: calc(var(--nm-tabbar-height) + var(--nm-tabbar-bottom) + 14px);
   }
 }
 
@@ -336,12 +338,12 @@ html, body {
   left: 12px;
   right: 12px;
   bottom: var(--nm-tabbar-bottom);
-  height: 62px;
+  height: var(--nm-tabbar-height);
   border-radius: 22px;
   display: grid; grid-template-columns: repeat(5, 1fr);
   align-items: center;
   padding: 0 6px;
-  z-index: 1000;
+  z-index: 1200;
 }
 
 html[data-keyboard-open] .tabbar {
@@ -365,9 +367,9 @@ html[data-keyboard-open] .tabbar {
     position: fixed !important;
     inset: 0 !important;
     width: 100dvw !important;
-    height: var(--nm-app-height, 100lvh) !important;
-    min-height: var(--nm-app-height, 100lvh) !important;
-    max-height: var(--nm-app-height, 100lvh) !important;
+    height: var(--nm-app-height, 100dvh) !important;
+    min-height: var(--nm-app-height, 100dvh) !important;
+    max-height: var(--nm-app-height, 100dvh) !important;
   }
 
   .tabbar {
@@ -375,7 +377,7 @@ html[data-keyboard-open] .tabbar {
     left: 12px;
     right: 12px;
     bottom: var(--nm-tabbar-bottom);
-    height: 62px;
+    height: var(--nm-tabbar-height);
     border-radius: 22px;
     align-items: center;
     padding: 0 6px;
@@ -394,7 +396,7 @@ html[data-keyboard-open] .tabbar {
   bottom: var(--nm-composer-bottom);
   left: 16px;
   right: 16px;
-  z-index: 900;
+  z-index: 1100;
 }
 
 @media (max-width: 500px) {
