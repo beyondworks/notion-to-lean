@@ -15,6 +15,17 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
 <link rel="icon" type="image/png" href="/favicon.png"/>
 <script>
+  (function nmApplyInitialTheme() {
+    const dark = localStorage.getItem("nm-dark") === "1";
+    const themeColor = dark ? "#0E0E0E" : "#F1EEE7";
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    ["meta-theme-color", "meta-theme-color-light", "meta-theme-color-dark"].forEach((id) => {
+      const meta = document.getElementById(id);
+      if (meta) meta.setAttribute("content", themeColor);
+    });
+  })();
+
   // Keep localStorage-backed custom DB layout on the canonical dev origin.
   // localhost and 127.0.0.1 have separate storage, so 127 shows a fresh layout.
   if (location.hostname === "127.0.0.1") {
@@ -23,26 +34,126 @@
 
   function nmSyncViewportMetrics() {
     const vv = window.visualViewport;
-    const height = vv ? vv.height : window.innerHeight;
     const offsetTop = vv ? vv.offsetTop : 0;
-    const keyboard = Math.max(0, window.innerHeight - height - offsetTop);
-    document.documentElement.style.setProperty("--nm-app-height", `${height}px`);
+    const visualHeight = vv ? vv.height : window.innerHeight;
+    const isMobile = window.matchMedia("(max-width: 500px)").matches;
+    const isStandalone = Boolean(window.navigator.standalone) || window.matchMedia("(display-mode: standalone)").matches;
+    const layoutHeight = Math.max(
+      window.innerHeight || 0,
+      document.documentElement.clientHeight || 0,
+      visualHeight + offsetTop
+    );
+    const keyboard = Math.max(0, layoutHeight - visualHeight - offsetTop);
+    const screenCssHeight = isMobile && isStandalone && window.devicePixelRatio
+      ? Math.max(window.screen.width || 0, window.screen.height || 0) / window.devicePixelRatio
+      : 0;
+    const fullViewportPx = Math.max(layoutHeight, visualHeight, screenCssHeight);
+    const fullViewport = isMobile && isStandalone && fullViewportPx
+      ? `${Math.ceil(fullViewportPx)}px`
+      : (isMobile ? "100lvh" : "100dvh");
+    const height = keyboard > 80 ? `${Math.max(320, visualHeight)}px` : fullViewport;
+    document.documentElement.style.setProperty("--nm-app-height", height);
     document.documentElement.style.setProperty("--nm-keyboard-bottom", `${keyboard}px`);
+    document.documentElement.style.setProperty("--nm-safe-t-fallback", isMobile && isStandalone ? "44px" : "0px");
+    document.documentElement.style.setProperty("--nm-safe-b-fallback", isMobile && isStandalone ? "34px" : "0px");
+    document.documentElement.toggleAttribute("data-standalone-pwa", isMobile && isStandalone);
+    document.documentElement.toggleAttribute("data-keyboard-open", keyboard > 80);
+    window.nmRenderViewportDebug?.();
   }
+
+  function nmViewportSnapshot() {
+    const vv = window.visualViewport;
+    const tab = document.querySelector(".tabbar")?.getBoundingClientRect();
+    const phone = document.querySelector(".phone")?.getBoundingClientRect();
+    const rootStyle = getComputedStyle(document.documentElement);
+    return {
+      href: location.href,
+      standalone: Boolean(window.navigator.standalone) || window.matchMedia("(display-mode: standalone)").matches,
+      dpr: window.devicePixelRatio,
+      inner: [window.innerWidth, window.innerHeight],
+      client: [document.documentElement.clientWidth, document.documentElement.clientHeight],
+      visual: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round(vv.offsetTop)] : null,
+      screen: [window.screen.width, window.screen.height],
+      appHeight: rootStyle.getPropertyValue("--nm-app-height").trim(),
+      safeTop: rootStyle.getPropertyValue("--safe-t").trim(),
+      safeBottom: rootStyle.getPropertyValue("--safe-b").trim(),
+      keyboard: rootStyle.getPropertyValue("--nm-keyboard-bottom").trim(),
+      phone: phone ? [Math.round(phone.top), Math.round(phone.bottom), Math.round(phone.height)] : null,
+      tabbar: tab ? [Math.round(tab.top), Math.round(tab.bottom), Math.round(tab.height)] : null,
+    };
+  }
+
+  window.nmRenderViewportDebug = function nmRenderViewportDebug() {
+    const shouldShow = new URLSearchParams(location.search).has("debugViewport") || localStorage.getItem("nm-debug-viewport") === "1";
+    if (!shouldShow) {
+      document.getElementById("nm-vp-debug")?.remove();
+      return;
+    }
+    let panel = document.getElementById("nm-vp-debug");
+    if (!panel) {
+      panel = document.createElement("pre");
+      panel.id = "nm-vp-debug";
+      panel.style.cssText = [
+        "position:fixed",
+        "left:8px",
+        "right:8px",
+        "bottom:8px",
+        "z-index:99999",
+        "max-height:42vh",
+        "overflow:auto",
+        "margin:0",
+        "padding:10px",
+        "border-radius:12px",
+        "background:rgba(0,0,0,.82)",
+        "color:#fff",
+        "font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace",
+        "white-space:pre-wrap",
+        "box-shadow:0 8px 30px rgba(0,0,0,.28)",
+      ].join(";");
+      document.addEventListener("DOMContentLoaded", () => document.body.appendChild(panel), { once: true });
+      if (document.body) document.body.appendChild(panel);
+    }
+    panel.textContent = JSON.stringify(nmViewportSnapshot(), null, 2);
+  };
+  (function nmInstallViewportDebugGesture() {
+    let taps = 0;
+    let timer = 0;
+    window.addEventListener("pointerup", (event) => {
+      if (event.clientX > 116 || event.clientY > 116) return;
+      window.clearTimeout(timer);
+      taps += 1;
+      if (taps >= 5) {
+        taps = 0;
+        const enabled = localStorage.getItem("nm-debug-viewport") === "1";
+        localStorage.setItem("nm-debug-viewport", enabled ? "0" : "1");
+        window.nmRenderViewportDebug?.();
+        return;
+      }
+      timer = window.setTimeout(() => { taps = 0; }, 1600);
+    }, { passive: true });
+  })();
   nmSyncViewportMetrics();
   window.addEventListener("resize", nmSyncViewportMetrics, { passive: true });
   window.addEventListener("orientationchange", nmSyncViewportMetrics, { passive: true });
   window.visualViewport?.addEventListener("resize", nmSyncViewportMetrics, { passive: true });
   window.visualViewport?.addEventListener("scroll", nmSyncViewportMetrics, { passive: true });
+  window.addEventListener("focusin", (event) => {
+    const target = event.target;
+    if (!target || !["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+    window.setTimeout(() => {
+      target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    }, 260);
+  }, { passive: true });
 </script>
 <link rel="stylesheet" href="/design/styles/notion-ios.css"/>
 <style>
   html {
-    min-height: 100dvh;
+    height: 100%;
+    min-height: var(--nm-app-height, 100dvh);
     width: 100%;
     background: radial-gradient(1200px 700px at 50% 0%, #F1EEE7 0%, #E8E3D8 55%, #DDD6C7 100%);
   }
-  body { min-height: 100dvh; width: 100%; margin: 0; }
+  body { min-height: var(--nm-app-height, 100dvh); width: 100%; margin: 0; }
   body {
     background: radial-gradient(1200px 700px at 50% 0%, #F1EEE7 0%, #E8E3D8 55%, #DDD6C7 100%);
     overflow-x: hidden;
@@ -57,7 +168,7 @@
   .stage {
     width: 100%;
     min-width: 100%;
-    min-height: 100dvh;
+    min-height: var(--nm-app-height, 100dvh);
     display: flex; align-items: center; justify-content: center;
     padding: 40px 20px 60px;
     gap: 48px;
@@ -132,10 +243,11 @@
 
   /* ── Mobile: strip desktop-preview chrome ────────────── */
   @media (max-width: 500px) {
-    body { overflow: hidden; }
-    .stage { padding: 0; gap: 0; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); width: 100vw; min-width: 100vw; align-items: stretch; justify-content: flex-start; }
+    html, body { position: fixed; inset: 0; width: 100dvw; height: var(--nm-app-height, 100lvh); min-height: var(--nm-app-height, 100lvh); background: var(--n-bg-grouped); overflow: hidden; overscroll-behavior: none; }
+    [data-theme="dark"] html, [data-theme="dark"] body { background: var(--n-bg-grouped); }
+    .stage { position: fixed; inset: 0; padding: 0; gap: 0; height: var(--nm-app-height, 100lvh); min-height: var(--nm-app-height, 100lvh); width: 100dvw; min-width: 100dvw; align-items: stretch; justify-content: flex-start; background: var(--n-bg-grouped); overflow: hidden; }
     .stage-label, .toolbar, .screen-picker { display: none !important; }
-    #phone-root { width: 100vw; height: var(--nm-app-height, 100dvh); min-height: var(--nm-app-height, 100dvh); }
+    #phone-root { position: fixed; inset: 0; width: 100dvw; height: var(--nm-app-height, 100lvh); min-height: var(--nm-app-height, 100lvh); background: var(--n-bg-grouped); overflow: hidden; }
   }
 </style>
 </head>
@@ -239,6 +351,7 @@ function App() {
   React.useEffect(() => {
     localStorage.setItem("nm-dark", dark ? "1" : "0");
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
     // Sync status-bar / browser chrome color to the active theme so the
     // notch / safe-area reads as dark in dark mode and beige in light mode.
     const color = dark ? "#0E0E0E" : "#F1EEE7";

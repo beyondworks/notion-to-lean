@@ -73,6 +73,29 @@ window.nmStableDbMapJson = function nmStableDbMapJson(map) {
   return JSON.stringify(ordered);
 };
 
+window.nmInferDbRoles = function nmInferDbRoles(db) {
+  const title = String(db?.title || "").toLowerCase();
+  const props = Array.isArray(db?.properties) ? db.properties : [];
+  const propNames = props.map(p => String(p?.name || "").toLowerCase()).join(" ");
+  const propTypes = new Set(props.map(p => p?.type).filter(Boolean));
+  const hay = `${title} ${propNames}`;
+  const roles = [];
+
+  const hasDate = propTypes.has("date");
+  const hasMoney = propTypes.has("number") && /(amount|price|cost|money|금액|가격|비용|수입|지출|결제|영수증)/.test(hay);
+  const hasTaskish = /(task|todo|to-do|할 일|태스크|완료|done|status|상태|priority|우선순위)/.test(hay);
+
+  if (/(finance|money|expense|income|receipt|budget|가계|가계부|금전|수입|지출|영수증)/.test(hay) || hasMoney) roles.push("finance");
+  if (/(calendar|event|schedule|timeline|일정|캘린더|타임라인|예약)/.test(hay)) roles.push("calendar");
+  if (/(task|todo|to-do|kanban|backlog|태스크|할 일|업무)/.test(hay) || (hasTaskish && hasDate)) roles.push("tasks");
+  if (/(work|project|client|crm|pipeline|워크|프로젝트|고객|거래|영업)/.test(hay)) roles.push("works");
+  if (/(insight|article|knowledge|wiki|news|tips|research|인사이트|지식|뉴스|팁|리서치|아카이브)/.test(hay)) roles.push("insights");
+  if (/(reflection|journal|diary|script|memo|note|회고|일기|스크립트|메모|노트)/.test(hay)) roles.push("reflection");
+
+  if (!roles.includes("calendar") && roles.includes("tasks") && hasDate) roles.push("calendar");
+  return [...new Set(roles)];
+};
+
 window.nmLoadCoreDbMap = function nmLoadCoreDbMap() {
   let raw = {};
   try { raw = JSON.parse(localStorage.getItem("nm-core-db-map") || "{}") || {}; } catch {}
@@ -170,7 +193,10 @@ window.nmClearWorkspaceLocalState = function nmClearWorkspaceLocalState() {
       key === "nm-recent-pages" ||
       key.startsWith("nm-section-") ||
       key.startsWith("nm-db-alias-") ||
-      key.startsWith("nm-db-filter-")
+      key.startsWith("nm-db-filter-") ||
+      key.startsWith("nm-dbfilter-") ||
+      key.startsWith("nm-dbview-") ||
+      key.startsWith("nm-notion-view-")
     ) {
       localStorage.removeItem(key);
     }
@@ -186,11 +212,13 @@ window.nmRefreshSession = async function nmRefreshSession() {
     if (!res.ok) return null;
     const json = await res.json();
     localStorage.setItem("nm-oauth-configured", json.oauthConfigured ? "1" : "0");
+    localStorage.setItem("nm-oauth-connected", json.connected ? "1" : "0");
     // Auto-detect owner mode: server has NOTION_API_KEY but no OAuth session.
-    // Covers: fresh "demo", stale "oauth" (expired cookie), or unset mode.
+    // Preserve only an explicitly selected owner session; never switch OAuth users
+    // back to the owner's workspace just because the public server has an API key.
     if (!json.connected && json.internalKeyConfigured) {
       const currentMode = localStorage.getItem("nm-connection-mode");
-      if (!currentMode || currentMode === "demo" || currentMode === "oauth") {
+      if (currentMode === "owner") {
         localStorage.setItem("nm-connection-mode", "owner");
         localStorage.setItem("nm-onboarded", "1");
         window.nmInvalidate && window.nmInvalidate();
@@ -247,10 +275,13 @@ window.nmSaveDbMapping = async function nmSaveDbMapping(mapping) {
   const previousMapRaw = window.nmStableDbMapJson(window.nmLoadCoreDbMap?.() || {});
   const nextMapRaw = window.nmStableDbMapJson(result.map);
   if (previousMapRaw !== nextMapRaw) {
-    window.nmClearWorkspaceLocalState?.();
+    window.nmInvalidate && window.nmInvalidate();
   }
   localStorage.setItem("nm-core-db-map", JSON.stringify(result.map));
   if (window.nmConnectionMode() !== "oauth") return { ok: true, mapping };
+  if (localStorage.getItem("nm-oauth-connected") !== "1") {
+    return { ok: true, mapping: result.map, localOnly: true };
+  }
   const res = await fetch("/api/user/mapping", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -264,6 +295,7 @@ window.nmLogoutNotion = async function nmLogoutNotion() {
   localStorage.removeItem("nm-notion-token");
   localStorage.removeItem("nm-notion-profile");
   localStorage.removeItem("nm-profile-workspace");
+  localStorage.removeItem("nm-oauth-connected");
   localStorage.removeItem("nm-core-db-map");
   localStorage.removeItem("nm-workspace-key");
   window.nmClearWorkspaceLocalState?.();
@@ -511,11 +543,13 @@ function Phone({ children, dark, style }) {
   const isMobile = useIsMobile();
   const frame = isMobile
     ? {
-        width: "100vw",
-        height: "var(--nm-app-height, 100dvh)",
-        minHeight: "var(--nm-app-height, 100dvh)",
+        position: "fixed",
+        inset: 0,
+        width: "100dvw",
+        height: "var(--nm-app-height, 100lvh)",
+        minHeight: "var(--nm-app-height, 100lvh)",
         borderRadius: 0,
-        overflow: "hidden", position: "relative",
+        overflow: "hidden",
         background: "var(--n-bg-grouped)", boxShadow: "none",
         ...style,
       }
@@ -657,9 +691,12 @@ function ActionSheet({ open, title, subtitle, onClose, children }) {
           <div style={{width: 36, height: 5, borderRadius: 3, background: "var(--n-border-strong)"}}/>
         </div>
         {(title || subtitle) && (
-          <div style={{padding: "0 18px 12px"}}>
-            {title && <div className="t-headline">{title}</div>}
-            {subtitle && <div className="t-footnote" style={{marginTop: 2}}>{subtitle}</div>}
+          <div style={{padding: "0 18px 12px", display: "flex", alignItems: "flex-start", gap: 12}}>
+            <div style={{flex: 1, minWidth: 0}}>
+              {title && <div className="t-headline">{title}</div>}
+              {subtitle && <div className="t-footnote" style={{marginTop: 2}}>{subtitle}</div>}
+            </div>
+            <NavIconBtn icon="close" onClick={onClose}/>
           </div>
         )}
         <div style={{overflowY: "auto"}}>{children}</div>

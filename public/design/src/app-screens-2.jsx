@@ -25,16 +25,17 @@ function Assignees({ names, size = 22 }) {
   );
 }
 
-function ViewSwitcher({ view, setView }) {
-  const views = [
+function ViewSwitcher({ view, setView, views }) {
+  const defaultViews = [
     { k: "list", icon: "list", label: "리스트" },
     { k: "board", icon: "grid", label: "보드" },
     { k: "cal", icon: "calendar", label: "캘린더" },
     { k: "table", icon: "database", label: "테이블" },
   ];
+  const viewList = Array.isArray(views) && views.length ? views : defaultViews;
   return (
     <div style={{display: "flex", gap: 6, overflowX: "auto", padding: "6px 16px 10px"}} className="hide-scroll">
-      {views.map(v => (
+      {viewList.map(v => (
         <button key={v.k} onClick={() => setView(v.k)} style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "7px 12px",
@@ -158,6 +159,16 @@ function notionUrlFromId(id) {
 }
 
 function itemSortValue(item, sort) {
+  if (String(sort || "").startsWith("prop:")) {
+    const [, rawName] = String(sort).split(":");
+    const name = decodeURIComponent(rawName || "");
+    const prop = (item.properties || []).find(p => p.name === name);
+    if (!prop) return "";
+    if (prop.type === "date") return new Date(prop.value?.start || prop.text || 0).getTime();
+    if (prop.type === "number") return Number(prop.value ?? 0);
+    if (prop.type === "checkbox") return prop.value ? 1 : 0;
+    return String(prop.text || prop.value || "").toLowerCase();
+  }
   if (sort === "title_asc" || sort === "title_desc") return (item.title || item.client || item.t || "").toLowerCase();
   return new Date(item.lastEditedAt || item.createdAt || item.date || item._raw?.lastEditedAt || 0).getTime();
 }
@@ -167,25 +178,96 @@ function sortItems(list, sort) {
   next.sort((a, b) => {
     const av = itemSortValue(a, sort);
     const bv = itemSortValue(b, sort);
-    if (sort === "title_asc") return String(av).localeCompare(String(bv));
-    if (sort === "title_desc") return String(bv).localeCompare(String(av));
+    const propSort = String(sort || "").startsWith("prop:");
+    const numeric = propSort && typeof av === "number" && typeof bv === "number";
+    if (sort === "title_asc" || String(sort || "").endsWith(":asc")) {
+      return numeric ? Number(av) - Number(bv) : String(av).localeCompare(String(bv));
+    }
+    if (sort === "title_desc" || String(sort || "").endsWith(":desc")) {
+      return numeric ? Number(bv) - Number(av) : String(bv).localeCompare(String(av));
+    }
     if (sort === "edited_asc") return Number(av) - Number(bv);
     return Number(bv) - Number(av);
   });
   return next;
 }
 
-// Insights sub-category name → sub-DB id
-const INSIGHTS_SUB_DB = {
-  "AI":               "241003c7-f7be-800f-8f07-f95918c3a072",
-  "Claude Code":      "2fd003c7-f7be-80cb-90d3-dbecc15c507f",
-  "Scrap":            "247003c7-f7be-80c0-a9f4-cddbcd337415",
-  "Slack to Notion":  "247003c7-f7be-80c0-a9f4-cddbcd337415",
-  "Design":           "241003c7-f7be-804f-a021-fc24777ca9ad",
-  "Branding":         "247003c7-f7be-803a-83f5-fd9494d24d62",
-  "Build":            "247003c7-f7be-8074-a583-e1638fd3cfed",
-  "Marketing":        "247003c7-f7be-8035-83f4-d39480d66503",
-};
+function propNameMatches(prop, patterns) {
+  const name = String(prop?.name || "").toLowerCase();
+  return patterns.some(p => name.includes(p));
+}
+
+function analyzeDbSchema(schema, role) {
+  const props = Array.isArray(schema) ? schema : [];
+  const titleProp = props.find(p => p.type === "title") || null;
+  const dateProps = props.filter(p => p.type === "date");
+  const statusProps = props.filter(p => p.type === "status");
+  const selectProps = props.filter(p => p.type === "select");
+  const multiSelectProps = props.filter(p => p.type === "multi_select");
+  const checkboxProps = props.filter(p => p.type === "checkbox");
+  const numberProps = props.filter(p => p.type === "number");
+  const relationProps = props.filter(p => p.type === "relation");
+
+  const primaryDate =
+    dateProps.find(p => propNameMatches(p, ["date", "날짜", "일정", "due", "마감", "start", "시작"])) ||
+    dateProps[0] ||
+    null;
+  const primaryBoard =
+    statusProps[0] ||
+    selectProps.find(p => propNameMatches(p, ["status", "상태", "stage", "단계", "type", "분류", "category", "카테고리"])) ||
+    selectProps[0] ||
+    checkboxProps[0] ||
+    null;
+  const moneyProp =
+    numberProps.find(p => propNameMatches(p, ["amount", "price", "cost", "money", "금액", "가격", "비용", "수입", "지출"])) ||
+    null;
+
+  const views = [{ k: "list", icon: "list", label: "목록" }];
+  if (primaryDate) views.push({ k: "calendar", icon: "calendar", label: "캘린더" });
+  if (primaryBoard) views.push({ k: "board", icon: "grid", label: "보드" });
+  if (props.length) views.push({ k: "table", icon: "database", label: "표" });
+
+  let defaultView = "list";
+  if (role === "calendar" && primaryDate) defaultView = "calendar";
+  else if (role === "tasks" && primaryBoard) defaultView = "board";
+  else if (primaryDate && !primaryBoard) defaultView = "calendar";
+
+  return {
+    titleProp,
+    dateProps,
+    statusProps,
+    selectProps,
+    multiSelectProps,
+    checkboxProps,
+    numberProps,
+    relationProps,
+    primaryDate,
+    primaryBoard,
+    moneyProp,
+    views,
+    defaultView,
+  };
+}
+
+function viewTypeToMode(type) {
+  const raw = String(type || "").toLowerCase();
+  if (raw.includes("calendar")) return "calendar";
+  if (raw.includes("board")) return "board";
+  if (raw.includes("table")) return "table";
+  return "list";
+}
+
+function itemProp(item, name) {
+  return (item.properties || []).find(p => p.name === name) || null;
+}
+
+function formatGenericDate(value) {
+  const start = value?.start || value;
+  if (!start) return "";
+  const d = new Date(start);
+  if (Number.isNaN(d.getTime())) return String(start);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function DbListScreen({ go, goBack, ctx }) {
   const dbKey = ctx?.dbKey;
@@ -198,17 +280,27 @@ function DbListScreen({ go, goBack, ctx }) {
     ? { endpoint: `database-pages?dbId=${ctx.dbId}`, title: ctx.subTitle || "데이터베이스" }
     : (DB_CONFIG[dbKey || "tasks"] || DB_CONFIG.tasks);
   const isTasks = !usesGenericDb && (dbKey || "tasks") === "tasks";
+  const viewKey = `nm-dbview-${ctx?.dbId || dbKey || "tasks"}`;
+  const notionViewKey = `nm-notion-view-${ctx?.dbId || dbKey || "tasks"}`;
 
-  const [view, setView] = uS2("list");
+  const [view, setView] = uS2(() => {
+    try { return localStorage.getItem(viewKey) || "list"; }
+    catch { return "list"; }
+  });
+  const [selectedViewId, setSelectedViewId] = uS2(() => {
+    try { return localStorage.getItem(notionViewKey) || ""; }
+    catch { return ""; }
+  });
   const [tasks, setTasks] = uS2([]);
   const [items, setItems] = uS2([]);
   const [dbSchema, setDbSchema] = uS2([]);
+  const [notionViews, setNotionViews] = uS2([]);
   const [loading, setLoading] = uS2(true);
-  const [filter, setFilter] = uS2("today"); // today | tomorrow | overdue
+  const [filter, setFilter] = uS2("all"); // all | today | tomorrow | overdue
   const [query, setQuery] = uS2("");
   const [createOpen, setCreateOpen] = uS2(false);
   const filterKey = `nm-dbfilter-${ctx?.dbId || dbKey || "tasks"}`;
-  const defaultDbFilter = { sort: "edited_desc", taskStatus: "open", category: "", propertyName: "", propertyValue: "" };
+  const defaultDbFilter = { sort: usesGenericDb ? "notion_view" : "edited_desc", taskStatus: "open", category: "", propertyName: "", propertyValue: "" };
   const [dbFilter, setDbFilter] = uS2(() => {
     try { return { ...defaultDbFilter, ...(JSON.parse(localStorage.getItem(filterKey) || "{}")) }; }
     catch { return defaultDbFilter; }
@@ -216,20 +308,62 @@ function DbListScreen({ go, goBack, ctx }) {
   const [filterOpen, setFilterOpen] = uS2(false);
   const [moreOpen, setMoreOpen] = uS2(false);
   const endpointUrl = usesGenericDb
-    ? `/api/database-pages?dbId=${encodeURIComponent(ctx.dbId)}`
+    ? `/api/database-pages?dbId=${encodeURIComponent(ctx.dbId)}${selectedViewId ? `&viewId=${encodeURIComponent(selectedViewId)}` : ""}`
     : (window.nmCoreEndpoint?.(dbKey || "tasks") || `/api/${cfg.endpoint}`);
   const dbNotionUrl = notionUrlFromId(ctx?.dbId || coreDbId2(dbKey || "tasks"));
+  const dbProfile = React.useMemo(
+    () => analyzeDbSchema(dbSchema, ctx?.dbRole || dbKey),
+    [dbSchema, ctx?.dbRole, dbKey]
+  );
 
   const updateDbFilter = (patch) => {
     const next = { ...dbFilter, ...patch };
     setDbFilter(next);
     localStorage.setItem(filterKey, JSON.stringify(next));
   };
+  const chooseView = (nextView) => {
+    setView(nextView);
+    try { localStorage.setItem(viewKey, nextView); } catch {}
+  };
+  const chooseNotionView = (nextView) => {
+    const id = nextView?.id || "";
+    setSelectedViewId(id);
+    if (id) {
+      try { localStorage.setItem(notionViewKey, id); } catch {}
+    } else {
+      try { localStorage.removeItem(notionViewKey); } catch {}
+    }
+    chooseView(viewTypeToMode(nextView?.type));
+    updateDbFilter({sort: "notion_view"});
+  };
   React.useEffect(() => {
     try { setDbFilter({ ...defaultDbFilter, ...(JSON.parse(localStorage.getItem(filterKey) || "{}")) }); }
     catch { setDbFilter(defaultDbFilter); }
     setQuery("");
   }, [filterKey]);
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem(viewKey);
+      if (saved) setView(saved);
+      else setView("list");
+    } catch {
+      setView("list");
+    }
+  }, [viewKey]);
+  React.useEffect(() => {
+    try { setSelectedViewId(localStorage.getItem(notionViewKey) || ""); }
+    catch { setSelectedViewId(""); }
+  }, [notionViewKey]);
+  React.useEffect(() => {
+    if (!usesGenericDb || !dbSchema.length) return;
+    if (selectedViewId) return;
+    let saved = "";
+    try { saved = localStorage.getItem(viewKey) || ""; } catch {}
+    const allowed = new Set(dbProfile.views.map(v => v.k));
+    if ((saved && !allowed.has(saved)) || (!saved && view !== dbProfile.defaultView)) {
+      chooseView(dbProfile.defaultView);
+    }
+  }, [usesGenericDb, dbSchema.length, dbProfile.defaultView, dbProfile.views, view, viewKey, selectedViewId]);
 
   const toggleTaskDone = async (taskId, currentDone) => {
     setTasks(tasks.map(t => t.id === taskId ? {...t, status: currentDone ? "진행중" : "완료", _raw: {...t._raw, done: !currentDone}} : t));
@@ -284,12 +418,18 @@ function DbListScreen({ go, goBack, ctx }) {
       .then(j => {
         const raw = j.data || [];
         setDbSchema(Array.isArray(j.schema) ? j.schema : []);
+        const views = Array.isArray(j.views) ? j.views : [];
+        setNotionViews(views);
+        if (selectedViewId && views.length && !views.some(v => v.id === selectedViewId)) {
+          setSelectedViewId("");
+          try { localStorage.removeItem(notionViewKey); } catch {}
+        }
         if (isTasks) setTasks(raw.map(mapNotionTaskToCard));
         else setItems(raw);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [endpointUrl, isTasks]);
+  }, [endpointUrl, isTasks, selectedViewId, notionViewKey]);
   React.useEffect(() => {
     fetchDbData(true);
     const interval = setInterval(() => fetchDbData(false), 20000);
@@ -316,7 +456,7 @@ function DbListScreen({ go, goBack, ctx }) {
   const genericFilterOptions = activeGenericFilter?.type === "checkbox"
     ? [{name: "true", label: "체크됨"}, {name: "false", label: "체크 안 됨"}]
     : (activeGenericFilter?.options || []).map(o => ({name: o.name, label: o.name}));
-  const visibleItems = sortItems((query.trim()
+  const filteredItems = (query.trim()
     ? items.filter((i) => {
         const needle = query.toLowerCase();
         const haystack = [
@@ -339,12 +479,16 @@ function DbListScreen({ go, goBack, ctx }) {
     }
     if (!dbFilter.category) return true;
     return (i.category || i.type || "") === dbFilter.category;
-  }), dbFilter.sort);
+  });
+  const visibleItems = usesGenericDb && dbFilter.sort === "notion_view"
+    ? filteredItems
+    : sortItems(filteredItems, dbFilter.sort);
   const categoryOptions = usesGenericDb ? [] : Array.from(new Set(items.map(i => i.category || i.type).filter(Boolean))).sort();
-  const genericTableColumns = usesGenericDb ? dbSchema.filter(p => p.type !== "title").slice(0, 4) : [];
-  const genericBoardProp = usesGenericDb
-    ? (genericFilterProps.find(p => ["status", "select"].includes(p.type)) || genericFilterProps[0] || null)
-    : null;
+  const genericTableColumns = usesGenericDb ? dbSchema.filter(p => p.type !== "title").slice(0, 5) : [];
+  const genericBoardProp = usesGenericDb ? dbProfile.primaryBoard : null;
+  const genericSortProps = usesGenericDb
+    ? dbSchema.filter(p => ["title", "date", "number", "select", "status", "checkbox"].includes(p.type)).slice(0, 8)
+    : [];
   const genericBoardGroups = React.useMemo(() => {
     if (!usesGenericDb || !genericBoardProp) return [];
     const groups = {};
@@ -361,6 +505,21 @@ function DbListScreen({ go, goBack, ctx }) {
     });
     return Object.entries(groups);
   }, [usesGenericDb, genericBoardProp, visibleItems]);
+  const genericCalendarGroups = React.useMemo(() => {
+    if (!usesGenericDb || !dbProfile.primaryDate) return [];
+    const groups = {};
+    visibleItems.forEach(item => {
+      const prop = itemProp(item, dbProfile.primaryDate.name);
+      const label = prop?.value?.start ? formatGenericDate(prop.value) : "날짜 없음";
+      groups[label] = groups[label] || [];
+      groups[label].push(item);
+    });
+    return Object.entries(groups).sort(([a], [b]) => {
+      if (a === "날짜 없음") return 1;
+      if (b === "날짜 없음") return -1;
+      return new Date(a.replace(/\./g, "-")).getTime() - new Date(b.replace(/\./g, "-")).getTime();
+    });
+  }, [usesGenericDb, dbProfile.primaryDate, visibleItems]);
   const filterActive =
     dbFilter.sort !== defaultDbFilter.sort ||
     (isTasks && dbFilter.taskStatus !== defaultDbFilter.taskStatus) ||
@@ -497,7 +656,7 @@ function DbListScreen({ go, goBack, ctx }) {
         left={<NavIconBtn icon="back" onClick={handleBack}/>}
         right={<><NavIconBtn icon="filter" badge={filterActive} onClick={() => setFilterOpen(true)}/><NavIconBtn icon="more" onClick={() => setMoreOpen(true)}/></>}
       />
-      {isTasks && <ViewSwitcher view={view} setView={setView}/>}
+      {isTasks && <ViewSwitcher view={view} setView={chooseView}/>}
       <div style={{flex: 1, overflowY: "auto", padding: "2px 16px 0"}} className="scroll-fade">
         {!isTasks && dbKey !== "finance" && (
           <div style={{paddingTop: 12}}>
@@ -515,24 +674,47 @@ function DbListScreen({ go, goBack, ctx }) {
               </div>
             </div>
 
+            {usesGenericDb && notionViews.length > 0 && (
+              <div style={{display: "flex", gap: 6, overflowX: "auto", padding: "0 0 8px"}} className="hide-scroll">
+                <button onClick={() => chooseNotionView(null)} style={{
+                  flexShrink: 0,
+                  border: "none",
+                  borderRadius: 16,
+                  padding: "8px 12px",
+                  background: !selectedViewId ? "var(--n-accent)" : "var(--n-surface)",
+                  color: !selectedViewId ? "var(--n-bg)" : "var(--n-text)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: !selectedViewId ? "none" : "var(--sh-1)",
+                }}>전체</button>
+                {notionViews.map(v => {
+                  const on = selectedViewId === v.id;
+                  return (
+                    <button key={v.id} onClick={() => chooseNotionView(v)} style={{
+                      flexShrink: 0,
+                      border: "none",
+                      borderRadius: 16,
+                      padding: "8px 12px",
+                      background: on ? "var(--n-accent)" : "var(--n-surface)",
+                      color: on ? "var(--n-bg)" : "var(--n-text)",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      boxShadow: on ? "none" : "var(--sh-1)",
+                    }}>
+                      <Icon name={viewTypeToMode(v.type) === "calendar" ? "calendar" : viewTypeToMode(v.type) === "board" ? "grid" : viewTypeToMode(v.type) === "table" ? "database" : "list"} size={14}/>
+                      {v.name || "뷰"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {usesGenericDb && (
-              <div style={{display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 10}}>
-                {[
-                  ["list", "목록"],
-                  ["table", "표"],
-                  ["board", "보드"],
-                ].map(([k, label]) => (
-                  <button key={k} onClick={() => setView(k)} style={{
-                    border: "none",
-                    borderRadius: 12,
-                    padding: "9px 8px",
-                    background: view === k ? "var(--n-accent)" : "var(--n-surface)",
-                    color: view === k ? "var(--n-bg)" : "var(--n-text)",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    boxShadow: view === k ? "none" : "var(--sh-1)",
-                  }}>{label}</button>
-                ))}
+              <div style={{margin: "0 -16px 4px"}}>
+                <ViewSwitcher view={view} setView={chooseView} views={dbProfile.views}/>
               </div>
             )}
 
@@ -540,6 +722,63 @@ function DbListScreen({ go, goBack, ctx }) {
               const visible = visibleItems;
               if (visible.length === 0 && !loading) {
                 return <div style={{textAlign: "center", padding: "40px 20px", color: "var(--n-text-muted)"}} className="t-footnote">{query ? "일치 항목 없음" : "항목이 없어요"}</div>;
+              }
+              if (usesGenericDb && view === "calendar" && dbProfile.primaryDate) {
+                return (
+                  <div style={{display: "grid", gap: 10}}>
+                    {genericCalendarGroups.map(([label, list]) => (
+                      <div key={label}>
+                        <div className="t-caption" style={{padding: "4px 2px 8px"}}>
+                          {label} · {list.length}
+                        </div>
+                        {list.map(it => {
+                          const dateProp = itemProp(it, dbProfile.primaryDate.name);
+                          const subProps = (it.preview || [])
+                            .filter(p => p.name !== dbProfile.primaryDate.name)
+                            .slice(0, 3);
+                          return (
+                            <div key={it.id} onClick={() => go("page", {id: it.id})} style={{
+                              background: "var(--n-surface)",
+                              borderRadius: 14,
+                              padding: "12px 14px",
+                              marginBottom: 8,
+                              boxShadow: "var(--sh-1)",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
+                            }}>
+                              <div style={{
+                                width: 46,
+                                height: 46,
+                                borderRadius: 12,
+                                background: "var(--n-surface-hover)",
+                                display: "grid",
+                                placeItems: "center",
+                                color: "var(--n-text-muted)",
+                                flexShrink: 0,
+                                fontWeight: 800,
+                              }}>
+                                {dateProp?.value?.start ? String(new Date(dateProp.value.start).getDate()).padStart(2, "0") : "-"}
+                              </div>
+                              <div style={{flex: 1, minWidth: 0}}>
+                                <div className="t-body" style={{fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+                                  {it.title || "(제목 없음)"}
+                                </div>
+                                <div className="t-footnote" style={{marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap"}}>
+                                  {subProps.length
+                                    ? subProps.map(p => <span key={`${it.id}-${p.name}`}>{p.name}: {p.text}</span>)
+                                    : <span>{dbProfile.primaryDate.name}</span>}
+                                </div>
+                              </div>
+                              <div className="chev"/>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                );
               }
               if (usesGenericDb && view === "table") {
                 return (
@@ -604,10 +843,7 @@ function DbListScreen({ go, goBack, ctx }) {
               }
               return visible.map((it) => {
                 const itemTitle = it.title || it.client || "(제목 없음)";
-                const subDbMatch = dbKey === "insights" && !subDbId ? INSIGHTS_SUB_DB[itemTitle] : null;
-                const handleClick = subDbMatch
-                  ? () => go("db-list", {dbKey: "insights", dbId: subDbMatch, subTitle: itemTitle})
-                  : () => go("page", {id: it.id});
+                const handleClick = () => go("page", {id: it.id});
                 const dateStr = formatCreatedAt(it.createdAt);
                 return (
                   <div key={it.id}
@@ -660,6 +896,7 @@ function DbListScreen({ go, goBack, ctx }) {
             {/* Filter pills: 오늘 / 내일 / 못한 일 */}
             <div style={{display: "flex", gap: 6, padding: "6px 2px 12px", overflowX: "auto"}} className="hide-scroll">
               {[
+                {k: "all",      label: "전체",       count: tasks.filter(t => !((t._raw?.done) || t.status==="완료")).length},
                 {k: "today",    label: "오늘 할 일",  count: tasks.filter(t => !((t._raw?.done) || t.status==="완료") && dueDateOf(t) && sameDay(dueDateOf(t), nowDay)).length},
                 {k: "tomorrow", label: "내일 할 일",  count: tasks.filter(t => !((t._raw?.done) || t.status==="완료") && dueDateOf(t) && sameDay(dueDateOf(t), tomDay)).length},
                 {k: "overdue",  label: "못한 일",    count: tasks.filter(t => !((t._raw?.done) || t.status==="완료") && dueDateOf(t) && dueDateOf(t) < nowDay).length},
@@ -690,7 +927,7 @@ function DbListScreen({ go, goBack, ctx }) {
 
             {sortedFilteredTasks.length === 0 ? (
               <div style={{textAlign: "center", padding: "40px 20px", color: "var(--n-text-muted)"}} className="t-footnote">
-                {filter === "today" ? "오늘 할 일이 없어요" : filter === "tomorrow" ? "내일 할 일이 없어요" : "못한 일이 없어요"}
+                {filter === "all" ? "표시할 항목이 없어요" : filter === "today" ? "오늘 할 일이 없어요" : filter === "tomorrow" ? "내일 할 일이 없어요" : "못한 일이 없어요"}
               </div>
             ) : (
               // 분류별 프리뷰
@@ -792,7 +1029,7 @@ function DbListScreen({ go, goBack, ctx }) {
       </div>
 
       {/* FAB */}
-      <button className="fab" style={{right: 20, bottom: "calc(var(--nm-tabbar-space, 100px) + 4px)"}} onClick={() => go("event-edit", {dbKey, dbId: subDbId})}>
+      <button className="fab" style={{right: 20, bottom: "calc(var(--nm-tabbar-space, 100px) + 4px)"}} onClick={() => go("event-edit", {dbKey, dbId: subDbId, dbRole: ctx?.dbRole, subTitle: effectiveTitle})}>
         <Icon name="plus" size={24} color="var(--n-bg)"/>
       </button>
 
@@ -803,10 +1040,20 @@ function DbListScreen({ go, goBack, ctx }) {
           <div className="t-caption" style={{marginBottom: 8}}>정렬</div>
           <div style={{display: "grid", gap: 6}}>
             {[
+              ...(usesGenericDb ? [["notion_view", "Notion 뷰 순서"]] : []),
               ["edited_desc", "최근 수정 먼저"],
               ["edited_asc", "오래된 수정 먼저"],
               ["title_asc", "제목 A-Z"],
               ["title_desc", "제목 Z-A"],
+              ...genericSortProps.flatMap(prop => {
+                if (prop.type === "title") return [];
+                const key = encodeURIComponent(prop.name);
+                const suffix = prop.type === "date" ? "날짜" : prop.type === "number" ? "숫자" : "속성";
+                return [
+                  [`prop:${key}:asc`, `${prop.name} ${suffix} 오름차순`],
+                  [`prop:${key}:desc`, `${prop.name} ${suffix} 내림차순`],
+                ];
+              }),
             ].map(([k, label]) => (
               <button key={k} onClick={() => updateDbFilter({sort: k})} style={{
                 border: "none", borderRadius: 12, padding: "10px 12px", textAlign: "left",

@@ -56,7 +56,9 @@ export async function POST(request: Request) {
       typeof incomingProperties.__defaultDate === 'string'
         ? incomingProperties.__defaultDate
         : null;
-    delete incomingProperties.__defaultDate;
+    for (const key of Object.keys(incomingProperties)) {
+      if (key.startsWith('__')) delete incomingProperties[key];
+    }
 
     if (defaultDate && schema) {
       const dateKey = findDateProperty(schema);

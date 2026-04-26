@@ -81,7 +81,10 @@ function TokenScreen({ go, goBack }) {
       setProfile(json.profile || null);
       go("db-picker");
     } catch (err) {
-      setError(err?.message || "토큰을 확인해주세요.");
+      const message = err?.message || "";
+      setError(message === "Failed to fetch"
+        ? "앱 서버에 연결할 수 없습니다. 로컬에서는 npm run dev가 실행 중인지 확인한 뒤 다시 시도해주세요."
+        : message || "토큰을 확인해주세요.");
     } finally {
       setConnecting(false);
     }
@@ -127,7 +130,7 @@ function TokenScreen({ go, goBack }) {
         <div className="g-header">고급 · INTERNAL INTEGRATION TOKEN</div>
         <div className="g-list">
           <div className="g-row" style={{padding: 16}}>
-            <input className="input" placeholder="secret_..." value={val}
+            <input className="input" placeholder="ntn_... 또는 secret_..." value={val}
               onChange={e => setVal(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") connect(); }}
               style={{background: "transparent", padding: 0, fontFamily: "var(--f-mono)", fontSize: 14}}/>
@@ -185,14 +188,6 @@ function TokenScreen({ go, goBack }) {
 function DbPickerScreen({ go, goBack }) {
   const [dbs, setDbs] = uS1([]);
   const [loading, setLoading] = uS1(true);
-  // Map DB id → home-section labels so picker shows which DBs are aliased on home
-  const DB_TO_HOME_LABEL = {
-    "242003c7-f7be-804a-9d6e-f76d5d0347b4": "홈: 태스크 · 캘린더",
-    "241003c7-f7be-8011-8ba4-cecf131df2a0": "홈: 웍스",
-    "241003c7-f7be-800b-b71c-df3acddc5bb8": "홈: 인사이트",
-    "28f003c7-f7be-8080-85b4-d73efe3cb896": "홈: 가계부",
-    "31e003c7-f7be-80a0-ab4f-c1e2249f3c24": "홈: 스크립트",
-  };
   const [pinned, setPinned] = uS1(() => {
     const ids = new Set();
     try {
@@ -205,6 +200,11 @@ function DbPickerScreen({ go, goBack }) {
   const [query, setQuery] = uS1("");
 
   uE1(() => {
+    const cached = readDbListCache();
+    if (cached && cached.length) {
+      setDbs(cached);
+      setLoading(false);
+    }
     loadDbList({ force: true })
       .then(list => {
         setDbs(list);
@@ -213,7 +213,7 @@ function DbPickerScreen({ go, goBack }) {
       .catch(() => setLoading(false));
   }, []);
 
-  const togglePin = (id) => {
+  const togglePin = async (id) => {
     const db = dbs.find(x => x.id === id);
     const next = new Set(pinned);
     const pinning = !next.has(id);
@@ -223,8 +223,10 @@ function DbPickerScreen({ go, goBack }) {
 
     if (pinning) {
       addDbToHome(db);
+      await autoAssignDbRoles(db, true);
     } else {
       removeDbFromHome(id);
+      await autoAssignDbRoles(db, false);
     }
   };
 
@@ -247,7 +249,7 @@ function DbPickerScreen({ go, goBack }) {
       />
       <div style={{flex: 1, overflowY: "auto"}} className="scroll-fade">
         <div className="t-footnote muted" style={{padding: "4px 20px 12px", background: "var(--n-surface-hover)", margin: "8px 16px 12px", borderRadius: 10, paddingTop: 10, lineHeight: 1.5}}>
-          토글 ON → 홈 "데이터베이스" 섹션에 원본 DB가 추가됩니다.<br/>
+          토글 ON → 홈에 원본 DB 카드가 추가되고, DB 특성에 맞는 모바일 뷰가 자동 추천됩니다.<br/>
           Notion에서 선택 권한을 준 DB만 표시됩니다.
         </div>
 
@@ -290,7 +292,7 @@ function DbPickerScreen({ go, goBack }) {
         ) : (
           <div className="g-list">
             {visible.map(d => {
-              const homeLabel = DB_TO_HOME_LABEL[d.id];
+              const roles = window.nmInferDbRoles?.(d) || [];
               return (
                 <div key={d.id} className="g-row g-row--with-icon" style={{alignItems: "flex-start"}}>
                   <div className="icon-tile icon-tile--lg" style={{background: "var(--n-surface-hover)", fontSize: 18}}>
@@ -300,7 +302,20 @@ function DbPickerScreen({ go, goBack }) {
                   </div>
                   <div style={{flex: 1, minWidth: 0}}>
                     <div className="t-headline" style={{overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>{d.title}</div>
-                    {homeLabel && <div className="t-footnote" style={{color: "var(--n-accent)", fontWeight: 500}}>{homeLabel}</div>}
+                    {roles.length > 0 && (
+                      <div className="t-footnote" style={{display: "flex", gap: 5, flexWrap: "wrap", marginTop: 5}}>
+                        <span style={{color: "var(--n-text-muted)", padding: "2px 0"}}>추천 뷰</span>
+                        {roles.slice(0, 3).map(role => (
+                          <span key={role} style={{
+                            padding: "2px 6px",
+                            borderRadius: 7,
+                            background: "var(--n-surface-hover)",
+                            color: "var(--n-text-muted)",
+                            fontWeight: 600,
+                          }}>{roleLabel(role)}</span>
+                        ))}
+                      </div>
+                    )}
                     <div className="t-footnote muted" style={{marginTop: 5}}>
                       {d.source === "data_source" ? "데이터 소스" : "데이터베이스"} · Notion 원본 속성 유지
                     </div>
@@ -332,11 +347,7 @@ const CORE_WIDGETS = [
 function defaultCoreWidgetsForConnection() {
   const mode = window.nmConnectionMode?.() || "demo";
   if (mode === "owner") return CORE_WIDGETS;
-  const map = window.nmLoadCoreDbMap?.() || {};
-  return CORE_WIDGETS.filter(w => {
-    if (w.key === "calendar") return !!(map.calendar || map.tasks);
-    return !!map[w.dbKey || w.key];
-  });
+  return [];
 }
 
 const DB_COLOR_POOL = [
@@ -356,6 +367,62 @@ function colorForDb(id) {
   return DB_COLOR_POOL[hash % DB_COLOR_POOL.length];
 }
 
+function dbSourceRank(source) {
+  if (source === "data_source") return 3;
+  if (source === "database") return 2;
+  if (source === "child_database") return 1;
+  return 0;
+}
+
+function dbSchemaKey(db) {
+  const props = Array.isArray(db?.properties)
+    ? db.properties.map(prop => `${prop.name}:${prop.type}`).sort().join("|")
+    : "";
+  return `${String(db?.title || "").trim().toLowerCase()}::${props}`;
+}
+
+function chooseDbListItem(current, next) {
+  if (dbSourceRank(next.source) !== dbSourceRank(current.source)) {
+    return dbSourceRank(next.source) > dbSourceRank(current.source) ? next : current;
+  }
+  return Date.parse(next.lastEditedAt || "") > Date.parse(current.lastEditedAt || "") ? next : current;
+}
+
+const DB_LIST_CACHE_VERSION = 2;
+
+function dbQueryId(db) {
+  return db?.databaseId || db?.dbId || db?.id;
+}
+
+function normalizeDbListItems(list) {
+  const byKey = new Map();
+  (Array.isArray(list) ? list : []).forEach(db => {
+    const queryId = dbQueryId(db);
+    if (!queryId || !db?.title || db.title === "(이름 없음)") return;
+    const normalizedDb = {
+      ...db,
+      id: queryId,
+      dbId: queryId,
+      dataSourceId: db.dataSourceId || (db.source === "data_source" && db.id !== queryId ? db.id : db.dataSourceId),
+    };
+    const key = String(normalizedDb.canonicalId || normalizedDb.databaseId || normalizedDb.id).replace(/-/g, "").toLowerCase();
+    if (!key) return;
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, normalizedDb);
+      return;
+    }
+    byKey.set(key, chooseDbListItem(current, normalizedDb));
+  });
+  const bySchema = new Map();
+  [...byKey.values()].forEach(db => {
+    const key = dbSchemaKey(db);
+    const current = bySchema.get(key);
+    bySchema.set(key, current ? chooseDbListItem(current, db) : db);
+  });
+  return [...bySchema.values()].sort((a, b) => String(a.title).localeCompare(String(b.title)));
+}
+
 function readDbListCache() {
   const memory = window.__nmDbListCache && Array.isArray(window.__nmDbListCache.data)
     ? window.__nmDbListCache
@@ -363,27 +430,28 @@ function readDbListCache() {
   try {
     const raw = localStorage.getItem("nm-db-list-cache");
     const parsed = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(parsed?.data)) {
-      if (memory && memory.data.length && (!parsed.at || memory.at >= parsed.at)) return memory.data;
-      window.__nmDbListCache = parsed;
-      return parsed.data;
+    if (Array.isArray(parsed?.data) && parsed.version === DB_LIST_CACHE_VERSION) {
+      if (memory && memory.data.length && (!parsed.at || memory.at >= parsed.at)) return normalizeDbListItems(memory.data);
+      const normalized = { data: normalizeDbListItems(parsed.data), at: parsed.at };
+      window.__nmDbListCache = normalized;
+      return normalized.data;
     }
   } catch {}
-  if (memory) return memory.data;
+  if (memory) return normalizeDbListItems(memory.data);
   return null;
 }
 
 function loadDbList({ force = false } = {}) {
   const cached = readDbListCache();
-  if (!force && cached) return Promise.resolve(cached);
+  if (!force && cached && cached.length) return Promise.resolve(cached);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   return fetch("/api/databases", { cache: "no-store", signal: controller.signal })
     .then(res => res.ok ? res.json() : { data: [] })
     .then(json => {
-      const data = Array.isArray(json?.data) ? json.data : [];
-      if (!force && !data.length && cached && cached.length) return cached;
-      const cache = { data, at: Date.now() };
+      const data = normalizeDbListItems(Array.isArray(json?.data) ? json.data : []);
+      if (!data.length && cached && cached.length) return cached;
+      const cache = { version: DB_LIST_CACHE_VERSION, data, at: Date.now() };
       window.__nmDbListCache = cache;
       try { localStorage.setItem("nm-db-list-cache", JSON.stringify(cache)); } catch {}
       return data;
@@ -426,11 +494,16 @@ function getHomePinnedDbIds() {
 }
 
 function makeDbWidget(db) {
-  const col = colorForDb(db?.id);
+  const id = dbQueryId(db);
+  const col = colorForDb(id);
+  const roles = window.nmInferDbRoles?.(db) || [];
+  const role = roles[0] || "database";
   return {
-    key: `db-${db.id}`,
-    dbId: db.id,
+    key: `db-${id}`,
+    dbId: id,
+    dataSourceId: db?.dataSourceId || null,
     dbKey: null,
+    role,
     n: db.title || "(이름 없음)",
     c: col.c,
     fg: col.fg,
@@ -440,23 +513,104 @@ function makeDbWidget(db) {
   };
 }
 
+function roleLabel(role) {
+  return ({
+    tasks: "태스크",
+    calendar: "캘린더",
+    works: "워크",
+    insights: "인사이트",
+    finance: "가계부",
+    reflection: "메모",
+    database: "DB",
+  })[role] || "DB";
+}
+
+async function autoAssignDbRoles(db, pinning) {
+  const id = dbQueryId(db);
+  if (!id || !window.nmSaveDbMapping || (window.nmConnectionMode?.() || "demo") === "owner") return;
+  const inferred = window.nmInferDbRoles?.(db) || [];
+  const roles = inferred.includes("tasks") && inferred.includes("calendar")
+    ? inferred.filter(role => role === "tasks" || role === "calendar")
+    : inferred.slice(0, 1);
+  const current = window.nmLoadCoreDbMap?.() || {};
+  const next = { ...current };
+  let changed = false;
+
+  if (pinning) {
+    roles.forEach(role => {
+      if (!next[role]) {
+        next[role] = id;
+        changed = true;
+      }
+    });
+  } else {
+    Object.entries(next).forEach(([role, mappedId]) => {
+      if (mappedId === id || mappedId === db.id || mappedId === db.dbId || mappedId === db.databaseId || mappedId === db.dataSourceId) {
+        delete next[role];
+        changed = true;
+      }
+    });
+  }
+
+  if (changed) await window.nmSaveDbMapping(next);
+}
+
 function addDbToHome(db) {
-  if (!db?.id) return;
+  const id = dbQueryId(db);
+  if (!id) return;
   const sectionId = getPrimarySectionId();
   const list = loadSectionWidgets(sectionId);
   const next = [...list];
 
-  const key = `db-${db.id}`;
-  if (!next.some(w => w.key === key || w.dbId === db.id)) next.push(makeDbWidget(db));
+  const key = `db-${id}`;
+  if (!next.some(w => w.key === key || w.dbId === id || w.dbId === db.id || w.dataSourceId === db.id)) next.push(makeDbWidget(db));
 
   saveSectionWidgets(sectionId, next);
   try {
     const pins = new Set(JSON.parse(localStorage.getItem("nm-pinned-dbs") || "[]"));
-    pins.add(db.id);
+    pins.add(id);
     localStorage.setItem("nm-pinned-dbs", JSON.stringify([...pins]));
   } catch {}
   window.dispatchEvent(new CustomEvent("nm-section-update", { detail: { sectionId } }));
   window.dispatchEvent(new CustomEvent("nm-home-widgets-update", { detail: { sectionId } }));
+}
+
+async function hydrateMappedDbCardsToHome() {
+  if ((window.nmConnectionMode?.() || "demo") === "owner") return false;
+  const map = window.nmLoadCoreDbMap?.() || {};
+  const ids = [...new Set(Object.values(map).filter(Boolean))];
+  if (!ids.length) return false;
+
+  const sectionId = getPrimarySectionId();
+  const existing = loadSectionWidgets(sectionId);
+  const existingIds = new Set(existing.map(w => w?.dbId).filter(Boolean));
+  const missingIds = ids.filter(id => !existingIds.has(id));
+  if (!missingIds.length) return false;
+
+  const dbList = await loadDbList({ force: false });
+  const byId = new Map();
+  dbList.forEach(db => {
+    [db.id, db.dbId, db.databaseId, db.dataSourceId].filter(Boolean).forEach(id => byId.set(id, db));
+  });
+  const byCanonical = new Map(dbList.map(db => [String(db.canonicalId || db.databaseId || db.id).replace(/-/g, "").toLowerCase(), db]));
+  const next = existing.slice();
+
+  missingIds.forEach(id => {
+    const normalized = String(id).replace(/-/g, "").toLowerCase();
+    const db = byId.get(id) || byCanonical.get(normalized);
+    if (db) next.push(makeDbWidget(db));
+  });
+
+  if (next.length === existing.length) return false;
+  saveSectionWidgets(sectionId, next);
+  try {
+    const pins = new Set(JSON.parse(localStorage.getItem("nm-pinned-dbs") || "[]"));
+    next.forEach(w => { if (w?.dbId) pins.add(w.dbId); });
+    localStorage.setItem("nm-pinned-dbs", JSON.stringify([...pins]));
+  } catch {}
+  window.dispatchEvent(new CustomEvent("nm-section-update", { detail: { sectionId } }));
+  window.dispatchEvent(new CustomEvent("nm-home-widgets-update", { detail: { sectionId } }));
+  return true;
 }
 
 function removeDbFromHome(id) {
@@ -1302,6 +1456,9 @@ function AddWidgetSheet({ onClose, onAdd, go }) {
         <div style={{overflowY: "auto", flex: 1}} className="hide-scroll">
           {loading ? (
             <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+              <div className="t-footnote muted" style={{textAlign: "center", padding: "16px 0 8px"}}>
+                DB 목록 불러오는 중...
+              </div>
               {[0, 1, 2, 3].map(i => (
                 <div key={i} style={{
                   height: 58, borderRadius: 12,
@@ -1331,10 +1488,13 @@ function AddWidgetSheet({ onClose, onAdd, go }) {
                 </div>
                 <div style={{flex: 1, minWidth: 0}}>
                   <div className="t-body" style={{fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>{d.title}</div>
+                  <div className="t-footnote muted" style={{marginTop: 3}}>
+                    {(window.nmInferDbRoles?.(d) || []).slice(0, 2).map(roleLabel).join(" · ") || "원본 DB"}
+                  </div>
                 </div>
                 <button
                   onClick={() => onAdd(d, "list")}
-                  data-add-mode="list"
+                  data-add-mode="auto"
                   style={{
                     border: "none",
                     background: "var(--n-surface-hover)",
@@ -1342,19 +1502,7 @@ function AddWidgetSheet({ onClose, onAdd, go }) {
                     padding: "6px 10px", borderRadius: 8,
                     fontSize: 12, fontWeight: 500,
                     cursor: "pointer", whiteSpace: "nowrap",
-                  }}>리스트</button>
-                <button
-                  onClick={() => onAdd(d, "calendar")}
-                  data-add-mode="calendar"
-                  title="날짜 속성을 기준으로 캘린더 뷰를 추가합니다"
-                  style={{
-                    border: "none",
-                    background: "#DDEBF1",
-                    color: "#337EA9",
-                    padding: "6px 10px", borderRadius: 8,
-                    fontSize: 12, fontWeight: 500,
-                    cursor: "pointer", whiteSpace: "nowrap",
-                  }}>캘린더</button>
+                  }}>추가</button>
               </div>
             ))
           )}
@@ -1385,13 +1533,31 @@ function loadSections() {
   return DEFAULT_SECTIONS;
 }
 function saveSections(list) { localStorage.setItem("nm-sections", JSON.stringify(list)); }
+function normalizeSectionWidgets(list) {
+  if (!Array.isArray(list)) return [];
+  const seenDbIds = new Set();
+  return list.reduce((acc, widget) => {
+    if (!widget || typeof widget !== "object") return acc;
+    const next = { ...widget };
+    if (next.dbId && !next.core) {
+      if (seenDbIds.has(next.dbId)) return acc;
+      seenDbIds.add(next.dbId);
+      next.key = `db-${next.dbId}`;
+      next.dbKey = null;
+      next.go = "db-list";
+    }
+    acc.push(next);
+    return acc;
+  }, []);
+}
 function loadSectionWidgets(id) {
   try {
     const raw = localStorage.getItem(`nm-section-${id}-widgets`);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return id === "default" ? ensureCalendarCoreWidget(parsed) : parsed;
+        const normalized = normalizeSectionWidgets(parsed);
+        return id === "default" ? ensureCalendarCoreWidget(normalized) : normalized;
       }
     }
   } catch {}
@@ -1401,7 +1567,7 @@ function loadSectionWidgets(id) {
       if (legacy) {
         const parsed = JSON.parse(legacy);
         if (Array.isArray(parsed)) {
-          const migrated = ensureCalendarCoreWidget(parsed);
+          const migrated = ensureCalendarCoreWidget(normalizeSectionWidgets(parsed));
           saveSectionWidgets(id, migrated);
           return migrated;
         }
@@ -1419,10 +1585,8 @@ function loadSectionWidgets(id) {
 function ensureCalendarCoreWidget(list) {
   if (!Array.isArray(list)) return list;
   if (list.some(w => w && (w.key === "calendar" || w.go === "calendar"))) return list;
-  const map = (typeof window !== "undefined" && window.nmLoadCoreDbMap) ? window.nmLoadCoreDbMap() : {};
   const mode = (typeof window !== "undefined" && window.nmConnectionMode) ? window.nmConnectionMode() : "demo";
-  const hasTasks = Boolean(map.calendar || map.tasks) || mode === "owner";
-  if (!hasTasks) return list;
+  if (mode !== "owner") return list;
   const calendarWidget = CORE_WIDGETS.find(w => w.key === "calendar");
   if (!calendarWidget) return list;
   // Insert just after tasks if present, otherwise at the start
@@ -1454,6 +1618,14 @@ function SectionList({ go }) {
       window.removeEventListener("nm-home-widgets-update", refresh);
       window.removeEventListener("nm-connection-update", refresh);
     };
+  }, []);
+
+  uE1(() => {
+    let cancelled = false;
+    hydrateMappedDbCardsToHome().then(changed => {
+      if (!cancelled && changed) setVersion(v => v + 1);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const hasAnyWidgets = sections.some(sec => loadSectionWidgets(sec.id).length > 0);
@@ -1656,24 +1828,32 @@ function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRe
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const addDb = (db, mode = "list") => {
+    if (!db?.id) return;
     const isCal = mode === "calendar";
-    const key = isCal ? `cal-${db.id}` : `db-${db.id}`;
-    if (widgets.find(w => w.key === key)) { setPickerOpen(false); return; }
+    const key = `db-${db.id}`;
     const col = isCal ? { c: "#DDEBF1", fg: "#337EA9" } : colorForDb(db.id);
-    const next = [...widgets, {
-      key, dbId: db.id, dbKey: isCal ? "calendar" : null,
-      n: isCal ? `${db.title} 캘린더` : db.title,
+    const roles = window.nmInferDbRoles?.(db) || [];
+    const role = isCal ? "calendar" : (roles[0] || "database");
+    const widget = {
+      key, dbId: db.id, dbKey: null,
+      role,
+      n: db.title,
       c: col.c, fg: col.fg,
       icon: isCal ? "📅" : (db.icon || "📦"),
       sub: "",
-      go: isCal ? "calendar" : "db-list",
-    }];
+      go: "db-list",
+    };
+    const existingIdx = widgets.findIndex(w => w.dbId === db.id || w.key === key || w.key === `cal-${db.id}`);
+    const next = existingIdx >= 0
+      ? widgets.map((w, idx) => idx === existingIdx ? { ...w, ...widget } : w)
+      : [...widgets, widget];
     saveW(next);
     try {
       const pins = new Set(JSON.parse(localStorage.getItem("nm-pinned-dbs") || "[]"));
       pins.add(db.id);
       localStorage.setItem("nm-pinned-dbs", JSON.stringify([...pins]));
     } catch {}
+    autoAssignDbRoles(db, true);
     window.dispatchEvent(new CustomEvent("nm-home-widgets-update", { detail: { sectionId: section.id } }));
     setPickerOpen(false);
   };
@@ -1838,7 +2018,7 @@ function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRe
               onContextMenu={(e) => { e.preventDefault(); setEditMode(true); }}
               onClick={() => {
                 if (editMode) return;
-                go(d.go || "db-list", { dbKey: d.dbId ? null : d.dbKey, dbId: d.dbId, subTitle: d.dbId ? d.n : null, widgetKey: d.key });
+                go(d.go || "db-list", { dbKey: d.dbId ? null : d.dbKey, dbId: d.dbId, dbRole: d.role || null, subTitle: d.dbId ? d.n : null, widgetKey: d.key });
               }}
               className={editMode ? "widget-wiggle" : ""}
               style={{
@@ -1864,6 +2044,7 @@ function DbSection({ go, section, isFirst, editMode, setEditMode, onRename, onRe
                       if (d.dbId) pins.delete(d.dbId);
                       localStorage.setItem("nm-pinned-dbs", JSON.stringify([...pins]));
                     } catch {}
+                    if (d.dbId) autoAssignDbRoles(d, false);
                   }}
                   aria-label="제거"
                   style={{

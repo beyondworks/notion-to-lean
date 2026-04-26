@@ -8,6 +8,9 @@ import { getNotionSessionFromRequest } from './notion-session';
 const envApiKey = process.env.NOTION_API_KEY;
 const NOTION_LEGACY_VERSION = '2022-06-28';
 const NOTION_CURRENT_VERSION = '2026-03-11';
+const DATABASE_LIST_CACHE_MS = 60_000;
+
+const databaseListCache = new Map<string, { at: number; data: any[] }>();
 
 export const notionClient: Client | null = envApiKey
   ? new Client({ auth: envApiKey })
@@ -58,7 +61,7 @@ export async function queryDatabase(
 
   const body: Record<string, unknown> = {};
   if (filter) body.filter = filter;
-  body.sorts = sorts ?? [{ timestamp: 'last_edited_time', direction: 'descending' }];
+  if (sorts) body.sorts = sorts;
   body.page_size = 100;
 
   const endpoints = [
@@ -66,27 +69,48 @@ export async function queryDatabase(
     { url: `https://api.notion.com/v1/databases/${dbId}/query`, version: NOTION_LEGACY_VERSION },
   ];
 
-  let lastError: unknown = null;
-  for (const endpoint of endpoints) {
-    const res = await fetch(endpoint.url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Notion-Version': endpoint.version,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+  async function queryEndpoint(endpoint: { url: string; version: string }): Promise<any[]> {
+    const results: any[] = [];
+    let cursor: string | undefined;
 
-    if (res.ok) {
+    do {
+      const pageBody = { ...body, ...(cursor ? { start_cursor: cursor } : {}) };
+      const res = await fetch(endpoint.url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Notion-Version': endpoint.version,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pageBody),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || `Notion query failed: ${res.status}`);
+      }
+
       const data = await res.json();
-      return data.results ?? [];
-    }
+      results.push(...(data.results ?? []));
+      cursor = data.has_more ? data.next_cursor : undefined;
+    } while (cursor);
 
-    const err = await res.json().catch(() => ({}));
-    lastError = err?.message || `Notion query failed: ${res.status}`;
+    return results;
   }
 
+  let lastError: unknown = null;
+  let best: any[] | null = null;
+  for (const endpoint of endpoints) {
+    try {
+      const results = await queryEndpoint(endpoint);
+      if (!best || results.length > best.length) best = results;
+      if (results.length > 1) return results;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : err;
+    }
+  }
+
+  if (best) return best;
   throw new Error(String(lastError || 'Notion query failed'));
 }
 
@@ -257,9 +281,22 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   });
 }
 
+function tokenCacheKey(token: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < token.length; i += 1) {
+    hash ^= token.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return String(hash >>> 0);
+}
+
 export async function listDatabases(authToken?: string | null): Promise<any[]> {
   const token = authToken || envApiKey;
   if (!token) return [];
+
+  const cacheKey = tokenCacheKey(token);
+  const cached = databaseListCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < DATABASE_LIST_CACHE_MS) return cached.data;
 
   const [legacyDatabases, dataSources, childDatabases] = await Promise.all([
     searchAll(token, { property: 'object', value: 'database' }, NOTION_LEGACY_VERSION).catch(() => []),
@@ -276,7 +313,9 @@ export async function listDatabases(authToken?: string | null): Promise<any[]> {
     const current = byId.get(key);
     byId.set(key, current ? chooseDatabaseCandidate(current, item) : item);
   }
-  return Array.from(byId.values());
+  const data = Array.from(byId.values());
+  databaseListCache.set(cacheKey, { at: Date.now(), data });
+  return data;
 }
 
 export async function getDatabaseSchema(dbId: string, authToken?: string | null): Promise<Record<string, any> | null> {
@@ -296,6 +335,120 @@ export async function getDatabaseSchema(dbId: string, authToken?: string | null)
     }
   }
   return null;
+}
+
+export type NotionViewSummary = {
+  id: string;
+  name: string;
+  type: string;
+  rawType?: string;
+  source?: string;
+  filter?: unknown;
+  sorts?: unknown;
+};
+
+function plainViewName(view: any): string {
+  const title = view?.name ?? view?.title;
+  if (typeof title === 'string' && title.trim()) return title.trim();
+  if (Array.isArray(title)) {
+    const text = title.map((t: any) => t?.plain_text ?? '').join('').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+function viewKind(view: any): string {
+  const raw = String(view?.type ?? view?.view_type ?? view?.layout ?? '').toLowerCase();
+  if (raw.includes('calendar')) return 'calendar';
+  if (raw.includes('board') || raw.includes('kanban')) return 'board';
+  if (raw.includes('table')) return 'table';
+  if (raw.includes('gallery')) return 'gallery';
+  if (raw.includes('timeline')) return 'timeline';
+  return 'list';
+}
+
+function summarizeView(view: any): NotionViewSummary | null {
+  if (!view?.id) return null;
+  const name = plainViewName(view);
+  if (!name) return null;
+  const type = viewKind(view);
+  return {
+    id: view.id,
+    name,
+    type,
+    rawType: view?.type ?? view?.view_type ?? view?.layout ?? undefined,
+    source: view?.source ?? undefined,
+    filter: view?.filter ?? view?.query?.filter ?? view?.[type]?.filter ?? undefined,
+    sorts: view?.sorts ?? view?.query?.sorts ?? view?.[type]?.sorts ?? undefined,
+  };
+}
+
+export async function listDatabaseViews(dbId: string, authToken?: string | null): Promise<NotionViewSummary[]> {
+  const token = authToken || envApiKey;
+  if (!token) return [];
+  const notionToken = token;
+
+  async function listWithParam(paramName: 'data_source_id' | 'database_id'): Promise<any[]> {
+    const out: any[] = [];
+    let cursor: string | undefined;
+    do {
+      const query = new URLSearchParams({ [paramName]: dbId, page_size: '100' });
+      if (cursor) query.set('start_cursor', cursor);
+      const res = await notionRest(`views?${query.toString()}`, notionToken, NOTION_CURRENT_VERSION);
+      if (!res.ok) return [];
+      const data = await res.json();
+      out.push(...(data.results ?? []));
+      cursor = data.has_more ? data.next_cursor : undefined;
+    } while (cursor);
+    return out;
+  }
+  async function listByPath(path: string): Promise<any[]> {
+    const out: any[] = [];
+    let cursor: string | undefined;
+    do {
+      const query = new URLSearchParams({ page_size: '100' });
+      if (cursor) query.set('start_cursor', cursor);
+      const res = await notionRest(`${path}?${query.toString()}`, notionToken, NOTION_CURRENT_VERSION);
+      if (!res.ok) return [];
+      const data = await res.json();
+      out.push(...(data.results ?? []));
+      cursor = data.has_more ? data.next_cursor : undefined;
+    } while (cursor);
+    return out;
+  }
+
+  let rows = await listByPath(`data_sources/${dbId}/views`);
+  if (!rows.length) rows = await listWithParam('data_source_id');
+  let fallbackRows: any[] = [];
+  if (!rows.length) {
+    fallbackRows = await listByPath(`databases/${dbId}/views`);
+    if (!fallbackRows.length) fallbackRows = await listWithParam('database_id');
+  }
+  const byId = new Map<string, NotionViewSummary>();
+  for (const row of [...rows, ...fallbackRows]) {
+    const summary = summarizeView(row);
+    if (summary) byId.set(summary.id, summary);
+  }
+  return Array.from(byId.values());
+}
+
+export async function queryView(viewId: string, authToken?: string | null): Promise<any[]> {
+  const token = authToken || envApiKey;
+  if (!token) return [];
+
+  let lastStatus = 0;
+  for (const path of [`views/${viewId}/query`, `views/${viewId}/queries`]) {
+    const res = await notionRest(path, token, NOTION_CURRENT_VERSION, {
+      method: 'POST',
+      body: JSON.stringify({ page_size: 100 }),
+    });
+    lastStatus = res.status;
+    if (res.ok) {
+      const data = await res.json();
+      return data.results ?? [];
+    }
+  }
+  throw new Error(`Notion view query failed: ${lastStatus}`);
 }
 
 // ---------------------------------------------------------------------------

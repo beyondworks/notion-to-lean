@@ -3,8 +3,11 @@ import {
   getDatabaseSchema,
   getRequestApiKey,
   isNotionEnabled,
+  listDatabases,
+  listDatabaseViews,
   pageUrl,
   queryDatabase,
+  queryView,
 } from '@/lib/notion';
 
 export const dynamic = 'force-dynamic';
@@ -91,7 +94,13 @@ function schemaSummary(schema: Record<string, any> | null) {
     const options = Array.isArray(config.options)
       ? config.options.map((opt: any) => ({ id: opt.id, name: opt.name, color: opt.color ?? null }))
       : [];
-    return { name, type, options };
+    return {
+      name,
+      type,
+      options,
+      format: config.format ?? null,
+      relationDatabaseId: config.database_id ?? config.data_source_id ?? null,
+    };
   });
 }
 
@@ -122,10 +131,50 @@ function pageToGeneric(page: any, schema: Record<string, any> | null) {
   };
 }
 
+function clampLimit(value: string | null): number {
+  if (value === null || value.trim() === '') return 80;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 80;
+  return Math.min(Math.max(Math.floor(parsed), 1), 100);
+}
+
+function genericSearchText(item: ReturnType<typeof pageToGeneric>): string {
+  const preview = Array.isArray(item.preview)
+    ? item.preview.map((prop) => `${prop.name} ${prop.text}`).join(' ')
+    : '';
+  return `${item.title} ${item.category} ${preview}`.toLowerCase();
+}
+
+function normalizeNotionId(id: unknown): string {
+  return typeof id === 'string' ? id.replace(/-/g, '').toLowerCase() : '';
+}
+
+async function resolveQueryableDatabaseId(dbId: string, token: string | null): Promise<string | null> {
+  if (!token) return null;
+  const target = normalizeNotionId(dbId);
+  if (!target) return null;
+  const rows = await listDatabases(token).catch(() => []);
+  for (const row of rows) {
+    const rowId = normalizeNotionId(row?.id);
+    const parentDatabaseId =
+      row?.database_parent?.database_id ??
+      row?.parent?.database_id ??
+      row?.parent?.data_source_id ??
+      null;
+    if (rowId === target && parentDatabaseId && normalizeNotionId(parentDatabaseId) !== target) {
+      return parentDatabaseId;
+    }
+  }
+  return null;
+}
+
 export async function GET(request: Request) {
   const token = getRequestApiKey(request);
   const { searchParams } = new URL(request.url);
   const dbId = searchParams.get('dbId');
+  const viewId = searchParams.get('viewId');
+  const q = (searchParams.get('q') ?? '').trim();
+  const limit = clampLimit(searchParams.get('limit'));
 
   if (!dbId) {
     return NextResponse.json({ error: 'dbId is required' }, { status: 400 });
@@ -136,13 +185,62 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [schema, pages] = await Promise.all([
+    const [schema, views] = await Promise.all([
       getDatabaseSchema(dbId, token),
-      queryDatabase(dbId, undefined, undefined, token),
+      listDatabaseViews(dbId, token).catch(() => []),
     ]);
+    const titleKey = titlePropertyName(schema);
+    const searchFilter = q && titleKey
+      ? { property: titleKey, title: { contains: q } }
+      : undefined;
+    let pages = await (viewId ? queryView(viewId, token).catch(() => []) : Promise.resolve([]));
+    if (!pages.length || pages.some((page) => !page?.properties)) {
+      pages = await queryDatabase(dbId, searchFilter, undefined, token);
+      if (pages.length <= 1) {
+        const queryableDbId = await resolveQueryableDatabaseId(dbId, token);
+        if (queryableDbId) {
+          const parentPages = await queryDatabase(queryableDbId, searchFilter, undefined, token).catch(() => []);
+          if (parentPages.length > pages.length) pages = parentPages;
+        }
+      }
+      if (pages.length <= 1 && titleKey) {
+        const titleSortedPages = await queryDatabase(
+          dbId,
+          searchFilter,
+          [{ property: titleKey, direction: 'ascending' }],
+          token,
+        ).catch(() => []);
+        if (titleSortedPages.length > pages.length) pages = titleSortedPages;
+      }
+      if (pages.length <= 1) {
+        const sortableProps = schemaSummary(schema)
+          .filter((prop) => ['checkbox', 'date', 'number', 'select', 'status', 'title'].includes(prop.type))
+          .filter((prop) => prop.name !== titleKey)
+          .slice(0, 8);
+        for (const prop of sortableProps) {
+          const sortedPages = await queryDatabase(
+            dbId,
+            searchFilter,
+            [{ property: prop.name, direction: 'ascending' }],
+            token,
+          ).catch(() => []);
+          if (sortedPages.length > pages.length) pages = sortedPages;
+          if (pages.length > 1) break;
+        }
+      }
+    }
+    let data = pages.map((page) => pageToGeneric(page, schema));
+    if (q) {
+      const normalizedQuery = q.toLowerCase();
+      data = data.filter((item) => genericSearchText(item).includes(normalizedQuery));
+    }
     return NextResponse.json({
-      data: pages.map((page) => pageToGeneric(page, schema)),
+      data: data.slice(0, limit),
       schema: schemaSummary(schema),
+      views,
+      selectedViewId: viewId || null,
+      query: q,
+      limit,
       mock: false,
     });
   } catch (err) {

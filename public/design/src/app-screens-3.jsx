@@ -389,6 +389,58 @@ function fmtDate(iso) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function plainRichText(list) {
+  return Array.isArray(list) ? list.map(t => t?.plain_text || "").join("") : "";
+}
+
+function pagePropValueForEdit(prop) {
+  if (!prop) return "";
+  const type = prop.type;
+  if (type === "rich_text") return plainRichText(prop.rich_text);
+  if (type === "select") return prop.select?.name || "";
+  if (type === "status") return prop.status?.name || "";
+  if (type === "multi_select") return Array.isArray(prop.multi_select) ? prop.multi_select.map(v => v?.name).filter(Boolean) : [];
+  if (type === "checkbox") return !!prop.checkbox;
+  if (type === "date") {
+    const start = prop.date?.start || "";
+    if (!start) return "";
+    if (start.includes("T")) return start.slice(0, 16);
+    return `${start}T00:00`;
+  }
+  if (type === "number") return prop.number ?? "";
+  if (type === "url") return prop.url || "";
+  if (type === "email") return prop.email || "";
+  if (type === "phone_number") return prop.phone_number || "";
+  if (type === "relation") return Array.isArray(prop.relation) ? prop.relation.map(v => v?.id).filter(Boolean) : [];
+  return "";
+}
+
+function buildEditablePageSchema(rawProps, schema) {
+  const byName = new Map((schema || []).map(p => [p.name, p]));
+  return Object.entries(rawProps || {})
+    .map(([name, raw]) => {
+      const type = raw?.type || "unknown";
+      const fromSchema = byName.get(name) || {};
+      return {
+        name,
+        type,
+        options: fromSchema.options || [],
+        format: fromSchema.format || null,
+        relationDatabaseId: fromSchema.relationDatabaseId || null,
+      };
+    })
+    .filter(prop => prop.type !== "title" && (GENERIC_CREATABLE_TYPES.has(prop.type) || GENERIC_READONLY_TYPES.has(prop.type)));
+}
+
+function initialPagePropValues(rawProps) {
+  const values = {};
+  Object.entries(rawProps || {}).forEach(([name, prop]) => {
+    if (prop?.type === "title") return;
+    values[name] = pagePropValueForEdit(prop);
+  });
+  return values;
+}
+
 function PageScreen({ go, goBack, ctx }) {
   const [collapsed, setCollapsed] = uS3({ props: false });
   const [page, setPage] = uS3(null);
@@ -399,6 +451,10 @@ function PageScreen({ go, goBack, ctx }) {
   const [moreOpen, setMoreOpen] = uS3(false);
   const [composer, setComposer] = uS3("");
   const [addingBlock, setAddingBlock] = uS3(false);
+  const [pageSchema, setPageSchema] = uS3([]);
+  const [pagePropValues, setPagePropValues] = uS3({});
+  const [propDirty, setPropDirty] = uS3(false);
+  const [propSaving, setPropSaving] = uS3(false);
 
   const pageId = ctx?.id;
 
@@ -443,6 +499,28 @@ function PageScreen({ go, goBack, ctx }) {
     window.addEventListener("focus", fetchPage);
     return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", fetchPage); };
   }, [pageId, fetchPage]);
+
+  uE3(() => {
+    if (!page?.propertiesRaw) return;
+    setPagePropValues(initialPagePropValues(page.propertiesRaw));
+    setPropDirty(false);
+  }, [page?.id, page?.lastEditedAt]);
+
+  uE3(() => {
+    if (!page?.parentDbId) {
+      setPageSchema([]);
+      return;
+    }
+    let mounted = true;
+    window.nmFetch(`/api/database-pages?dbId=${encodeURIComponent(page.parentDbId)}`, { ttl: 120000 })
+      .then(j => {
+        if (mounted) setPageSchema(Array.isArray(j?.schema) ? j.schema : []);
+      })
+      .catch(() => {
+        if (mounted) setPageSchema([]);
+      });
+    return () => { mounted = false; };
+  }, [page?.parentDbId]);
 
   const toggleCheck = async (blockId) => {
     const next = !checks[blockId];
@@ -615,11 +693,30 @@ function PageScreen({ go, goBack, ctx }) {
     } catch (e) {}
   };
 
+  const handleSaveProperties = async () => {
+    if (!pageId || !page || propSaving) return;
+    const schema = buildEditablePageSchema(page.propertiesRaw, pageSchema);
+    const properties = buildGenericPageProperties(schema, pagePropValues);
+    if (!Object.keys(properties).length) return;
+    setPropSaving(true);
+    try {
+      const r = await patch({ properties });
+      if (!r.ok) throw new Error("property patch failed");
+      setPropDirty(false);
+      setTimeout(fetchPage, 150);
+    } catch (e) {
+      window.nmToast && window.nmToast("속성 저장 실패");
+    } finally {
+      setPropSaving(false);
+    }
+  };
+
   const title = page?.title || (loading ? "불러오는 중..." : "(제목 없음)");
   const iconRaw = page?.icon || null;
   const iconType = page?.iconType || null;
   const cover = page?.cover || null; // null → no cover block
   const props = page?.properties || {};
+  const editablePageProps = buildEditablePageSchema(page?.propertiesRaw, pageSchema);
   const originalUrl = page?.notionUrl || (pageId ? `https://notion.so/${String(pageId).replace(/-/g, "")}` : "");
 
   const refreshPage = () => {
@@ -770,7 +867,7 @@ function PageScreen({ go, goBack, ctx }) {
         </div>
 
         {/* Collapsible properties */}
-        {propRows.length > 0 && (
+        {(editablePageProps.length > 0 || propRows.length > 0) && (
           <div style={{padding: "0 20px 4px"}}>
             <button onClick={() => setCollapsed({...collapsed, props: !collapsed.props})} style={{
               display: "flex", alignItems: "center", gap: 4,
@@ -778,17 +875,45 @@ function PageScreen({ go, goBack, ctx }) {
               color: "var(--n-text-muted)", padding: "6px 0", fontSize: 13, fontWeight: 500,
             }}>
               <Icon name={collapsed.props ? "chev-r" : "chev-d"} size={14}/>
-              속성 {propRows.length}개
+              속성 {(editablePageProps.length || propRows.length)}개
             </button>
             {!collapsed.props && (
-              <div style={{background: "var(--n-surface-hover)", borderRadius: 10, padding: "4px 0", marginTop: 4}}>
-                {propRows.map((r, i) => (
-                  <div key={i} style={{display: "flex", alignItems: "center", padding: "8px 14px", gap: 12}}>
-                    <div style={{width: 80, color: "var(--n-text-muted)", fontSize: 13, flexShrink: 0}}>{r.k}</div>
-                    <div style={{flex: 1}}>{r.v}</div>
+              editablePageProps.length > 0 ? (
+                <>
+                  <div className="g-list" style={{marginTop: 4}}>
+                    {editablePageProps.map(prop => (
+                      <GenericPropertyField
+                        key={`${prop.name}-${prop.type}`}
+                        prop={prop}
+                        value={pagePropValues[prop.name]}
+                        onChange={(value) => {
+                          setPagePropValues(prev => ({...prev, [prop.name]: value}));
+                          setPropDirty(true);
+                        }}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                  {propDirty && (
+                    <button
+                      className="btn btn--primary"
+                      onClick={handleSaveProperties}
+                      disabled={propSaving}
+                      style={{width: "100%", marginTop: 10, justifyContent: "center", opacity: propSaving ? 0.6 : 1}}
+                    >
+                      {propSaving ? "저장 중..." : "속성 저장"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div style={{background: "var(--n-surface-hover)", borderRadius: 10, padding: "4px 0", marginTop: 4}}>
+                  {propRows.map((r, i) => (
+                    <div key={i} style={{display: "flex", alignItems: "center", padding: "8px 14px", gap: 12}}>
+                      <div style={{width: 80, color: "var(--n-text-muted)", fontSize: 13, flexShrink: 0}}>{r.k}</div>
+                      <div style={{flex: 1}}>{r.v}</div>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         )}
@@ -809,7 +934,7 @@ function PageScreen({ go, goBack, ctx }) {
       </div>
 
       {/* Floating glass composer pill — block menu entry */}
-      <div style={{position: "absolute", bottom: "calc(var(--nm-tabbar-space, 100px) - 6px)", left: 16, right: 16, zIndex: 30}}>
+      <div className="page-composer">
         <div className="glass" style={{borderRadius: 20, padding: "10px 12px", display: "flex", alignItems: "center", gap: 8}}>
           <button
             onClick={appendComposerBlock}
@@ -874,6 +999,427 @@ const DB_LABEL = {
   tasks: "태스크", works: "웍스", insights: "인사이트", finance: "가계부", reflection: "스크립트",
 };
 
+const GENERIC_CREATABLE_TYPES = new Set([
+  "date",
+  "status",
+  "select",
+  "multi_select",
+  "number",
+  "checkbox",
+  "rich_text",
+  "url",
+  "email",
+  "phone_number",
+  "relation",
+]);
+const GENERIC_READONLY_TYPES = new Set([
+  "people",
+  "files",
+  "formula",
+  "rollup",
+  "created_time",
+  "created_by",
+  "last_edited_time",
+  "last_edited_by",
+]);
+
+function nmDateTimeLocal(date, time) {
+  return `${date}T${time}`;
+}
+
+function nmDatePayloadValue(value) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return `${value}:00`;
+  return value;
+}
+
+function initialGenericValues(schema, ctx, nowParts) {
+  const values = {};
+  const baseDate = ctx?.date || nowParts.date;
+  const baseDateTime = nmDateTimeLocal(baseDate, nowParts.time);
+  (schema || []).forEach(prop => {
+    if (!prop || prop.type === "title") return;
+    if (prop.type === "date") values[prop.name] = baseDateTime;
+    else if (prop.type === "checkbox") values[prop.name] = false;
+    else if (prop.type === "multi_select") values[prop.name] = [];
+    else if (prop.type === "relation") values[prop.name] = [];
+    else values[prop.name] = "";
+  });
+  return values;
+}
+
+function buildGenericPageProperties(schema, values) {
+  const props = {};
+  (schema || []).forEach(prop => {
+    const name = prop?.name;
+    const type = prop?.type;
+    if (!name || type === "title" || !GENERIC_CREATABLE_TYPES.has(type)) return;
+    const raw = values?.[name];
+    if (type === "date") {
+      const start = nmDatePayloadValue(raw);
+      if (start) props[name] = { date: { start } };
+      return;
+    }
+    if (type === "status") {
+      if (raw) props[name] = { status: { name: raw } };
+      return;
+    }
+    if (type === "select") {
+      if (raw) props[name] = { select: { name: raw } };
+      return;
+    }
+    if (type === "multi_select") {
+      const selected = Array.isArray(raw) ? raw.filter(Boolean) : [];
+      if (selected.length) props[name] = { multi_select: selected.map(value => ({ name: value })) };
+      return;
+    }
+    if (type === "number") {
+      if (raw !== "" && raw !== null && raw !== undefined) {
+        const num = Number(raw);
+        if (Number.isFinite(num)) props[name] = { number: num };
+      }
+      return;
+    }
+    if (type === "checkbox") {
+      props[name] = { checkbox: !!raw };
+      return;
+    }
+    if (type === "relation") {
+      const selected = Array.isArray(raw) ? raw.filter(Boolean) : [];
+      if (selected.length) props[name] = { relation: selected.map(id => ({ id })) };
+      return;
+    }
+    const text = String(raw || "").trim();
+    if (!text) return;
+    if (type === "rich_text") props[name] = { rich_text: [{ text: { content: text } }] };
+    if (type === "url") props[name] = { url: text };
+    if (type === "email") props[name] = { email: text };
+    if (type === "phone_number") props[name] = { phone_number: text };
+  });
+  return props;
+}
+
+function GenericPropertyField({ prop, value, onChange }) {
+  const options = Array.isArray(prop.options) ? prop.options : [];
+  const name = prop.name;
+  const [relationOptions, setRelationOptions] = uS3([]);
+  const [relationKnown, setRelationKnown] = uS3({});
+  const [relationQuery, setRelationQuery] = uS3("");
+  const [relationLoading, setRelationLoading] = uS3(false);
+  const isRelation = prop.type === "relation";
+  uE3(() => {
+    if (!isRelation || !prop.relationDatabaseId) {
+      setRelationOptions([]);
+      setRelationLoading(false);
+      return;
+    }
+    let mounted = true;
+    const timer = setTimeout(() => {
+      const query = relationQuery.trim();
+      const url = `/api/database-pages?dbId=${encodeURIComponent(prop.relationDatabaseId)}&limit=80${query ? `&q=${encodeURIComponent(query)}` : ""}`;
+      setRelationLoading(true);
+      window.nmFetch(url, { ttl: query ? 15000 : 120000 })
+        .then(j => {
+          if (!mounted) return;
+          const rows = Array.isArray(j?.data) ? j.data : [];
+          setRelationOptions(rows);
+          setRelationKnown(prev => {
+            const next = {...prev};
+            rows.forEach(item => {
+              if (item?.id) next[item.id] = item;
+            });
+            return next;
+          });
+        })
+        .catch(() => {
+          if (mounted) setRelationOptions([]);
+        })
+        .finally(() => {
+          if (mounted) setRelationLoading(false);
+        });
+    }, relationQuery.trim() ? 180 : 0);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [isRelation, prop.relationDatabaseId, relationQuery]);
+  const labelStyle = {minWidth: 84, maxWidth: 110, color: "var(--n-text)", fontWeight: 500};
+  const inputStyle = {
+    flex: 1,
+    minWidth: 0,
+    border: "none",
+    outline: "none",
+    background: "transparent",
+    color: "var(--n-text-muted)",
+    font: "inherit",
+    fontSize: 15,
+    textAlign: "right",
+  };
+
+  if (prop.type === "date") {
+    return (
+      <div className="g-row" style={{alignItems: "center"}}>
+        <Icon name="calendar" size={18} color="var(--n-text-muted)"/>
+        <div className="t-body" style={labelStyle}>{name}</div>
+        <input
+          type="datetime-local"
+          value={value || ""}
+          onChange={e => onChange(e.target.value)}
+          style={inputStyle}
+        />
+      </div>
+    );
+  }
+
+  if (prop.type === "number") {
+    return (
+      <div className="g-row" style={{alignItems: "center"}}>
+        <Icon name="tag" size={18} color="var(--n-text-muted)"/>
+        <div className="t-body" style={labelStyle}>{name}</div>
+        <input
+          type="number"
+          inputMode="decimal"
+          value={value || ""}
+          onChange={e => onChange(e.target.value)}
+          placeholder="0"
+          style={inputStyle}
+        />
+      </div>
+    );
+  }
+
+  if (prop.type === "checkbox") {
+    return (
+      <div className="g-row" style={{alignItems: "center"}}>
+        <Icon name="check" size={18} color="var(--n-text-muted)"/>
+        <div style={{flex: 1}} className="t-body">{name}</div>
+        <Toggle on={!!value} onChange={onChange}/>
+      </div>
+    );
+  }
+
+  if (prop.type === "status" || prop.type === "select") {
+    return (
+      <div className="g-row" style={{flexDirection: "column", alignItems: "stretch", gap: 8}}>
+        <div style={{display: "flex", alignItems: "center", gap: 10}}>
+          <Icon name="tag" size={18} color="var(--n-text-muted)"/>
+          <div className="t-body" style={{fontWeight: 500}}>{name}</div>
+        </div>
+        <div className="hide-scroll" style={{display: "flex", gap: 6, overflowX: "auto", paddingLeft: 28}}>
+          <button
+            onClick={() => onChange("")}
+            style={{
+              flexShrink: 0, border: "none", borderRadius: 15, padding: "6px 10px",
+              background: !value ? "var(--n-text)" : "var(--n-surface-hover)",
+              color: !value ? "var(--n-bg)" : "var(--n-text-muted)",
+              fontSize: 12, fontWeight: 600,
+            }}>없음</button>
+          {options.map(opt => (
+            <button
+              key={opt.id || opt.name}
+              onClick={() => onChange(opt.name)}
+              style={{
+                flexShrink: 0, border: "none", borderRadius: 15, padding: "6px 10px",
+                background: value === opt.name ? "var(--n-text)" : "var(--n-surface-hover)",
+                color: value === opt.name ? "var(--n-bg)" : "var(--n-text)",
+                fontSize: 12, fontWeight: 600,
+              }}>{opt.name}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (prop.type === "multi_select") {
+    const selected = Array.isArray(value) ? value : [];
+    return (
+      <div className="g-row" style={{flexDirection: "column", alignItems: "stretch", gap: 8}}>
+        <div style={{display: "flex", alignItems: "center", gap: 10}}>
+          <Icon name="tag" size={18} color="var(--n-text-muted)"/>
+          <div className="t-body" style={{fontWeight: 500}}>{name}</div>
+        </div>
+        <div className="hide-scroll" style={{display: "flex", gap: 6, overflowX: "auto", paddingLeft: 28}}>
+          {options.map(opt => {
+            const on = selected.includes(opt.name);
+            return (
+              <button
+                key={opt.id || opt.name}
+                onClick={() => onChange(on ? selected.filter(v => v !== opt.name) : [...selected, opt.name])}
+                style={{
+                  flexShrink: 0, border: "none", borderRadius: 15, padding: "6px 10px",
+                  background: on ? "var(--n-text)" : "var(--n-surface-hover)",
+                  color: on ? "var(--n-bg)" : "var(--n-text)",
+                  fontSize: 12, fontWeight: 600,
+                }}>{opt.name}</button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (prop.type === "relation") {
+    const selected = Array.isArray(value) ? value : [];
+    if (!prop.relationDatabaseId) {
+      return (
+        <div className="g-row" style={{alignItems: "center", opacity: 0.72}}>
+          <Icon name="database" size={18} color="var(--n-text-muted)"/>
+          <div style={{flex: 1}} className="t-body">{name}</div>
+          <div className="t-footnote" style={{color: "var(--n-text-muted)"}}>relation</div>
+        </div>
+      );
+    }
+
+    const visibleOptions = relationOptions.filter(item => item?.id && !selected.includes(item.id));
+    const selectedRows = selected.map(id => relationKnown[id] || relationOptions.find(item => item.id === id) || {id, title: "연결됨"});
+    const hasQuery = !!relationQuery.trim();
+
+    return (
+      <div className="g-row" style={{flexDirection: "column", alignItems: "stretch", gap: 10}}>
+        <div style={{display: "flex", alignItems: "center", gap: 10}}>
+          <Icon name="database" size={18} color="var(--n-text-muted)"/>
+          <div className="t-body" style={{fontWeight: 500}}>{name}</div>
+          <div className="t-footnote muted" style={{marginLeft: "auto"}}>
+            {relationLoading ? "불러오는 중" : `${selected.length}개 선택`}
+          </div>
+        </div>
+        <div style={{
+          marginLeft: 28,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "var(--n-surface-hover)",
+          borderRadius: 12,
+          padding: "8px 10px",
+        }}>
+          <Icon name="search" size={15} color="var(--n-text-muted)"/>
+          <input
+            value={relationQuery}
+            onChange={e => setRelationQuery(e.target.value)}
+            placeholder="연결할 페이지 검색"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              color: "var(--n-text)",
+              font: "inherit",
+              fontSize: 14,
+            }}
+          />
+          {relationQuery && (
+            <button
+              onClick={() => setRelationQuery("")}
+              aria-label="검색어 지우기"
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--n-text-muted)",
+                fontSize: 16,
+                lineHeight: 1,
+                padding: 0,
+              }}>×</button>
+          )}
+        </div>
+
+        {selectedRows.length > 0 && (
+          <div className="property-chip-row">
+            {selectedRows.map(item => (
+              <button
+                key={item.id}
+                onClick={() => onChange(selected.filter(v => v !== item.id))}
+                className="property-chip is-selected"
+              >{item.title || "연결됨"} ×</button>
+            ))}
+          </div>
+        )}
+
+        <div className="property-chip-row" style={{maxHeight: 168, overflowY: "auto"}}>
+          {visibleOptions.length ? visibleOptions.map(item => (
+            <button
+              key={item.id}
+              onClick={() => onChange([...selected, item.id])}
+              className="property-chip"
+              title={item.title || "(제목 없음)"}
+            >
+              <span style={{
+                width: 22,
+                height: 22,
+                borderRadius: 7,
+                background: "var(--n-surface)",
+                display: "grid",
+                placeItems: "center",
+                color: "var(--n-text-muted)",
+                flexShrink: 0,
+                fontSize: 11,
+                fontWeight: 700,
+              }}>{(item.title || "?").slice(0, 1).toUpperCase()}</span>
+              <span style={{
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: 180,
+              }}>
+                {item.title || "(제목 없음)"}
+              </span>
+            </button>
+          )) : (
+            <div className="t-footnote muted" style={{padding: "10px 0 4px", textAlign: "left"}}>
+              {relationLoading ? "연결할 페이지를 불러오는 중..." : hasQuery ? "검색 결과 없음" : "연결할 페이지 없음"}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (prop.type === "rich_text") {
+    return (
+      <div className="g-row" style={{alignItems: "flex-start"}}>
+        <Icon name="menu" size={18} color="var(--n-text-muted)" style={{marginTop: 2}}/>
+        <textarea
+          rows={2}
+          placeholder={name}
+          value={value || ""}
+          onChange={e => onChange(e.target.value)}
+          style={{flex: 1, border: "none", outline: "none", background: "transparent", resize: "none", font: "inherit", fontSize: 16, color: "var(--n-text)"}}
+        />
+      </div>
+    );
+  }
+
+  if (prop.type === "url" || prop.type === "email" || prop.type === "phone_number") {
+    const inputType = prop.type === "email" ? "email" : prop.type === "url" ? "url" : "tel";
+    return (
+      <div className="g-row" style={{alignItems: "center"}}>
+        <Icon name="share" size={18} color="var(--n-text-muted)"/>
+        <div className="t-body" style={labelStyle}>{name}</div>
+        <input
+          type={inputType}
+          value={value || ""}
+          onChange={e => onChange(e.target.value)}
+          placeholder={prop.type}
+          style={inputStyle}
+        />
+      </div>
+    );
+  }
+
+  if (GENERIC_READONLY_TYPES.has(prop.type)) {
+    return (
+      <div className="g-row" style={{alignItems: "center", opacity: 0.72}}>
+        <Icon name="database" size={18} color="var(--n-text-muted)"/>
+        <div style={{flex: 1}} className="t-body">{name}</div>
+        <div className="t-footnote" style={{color: "var(--n-text-muted)"}}>{prop.type}</div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function EventEditScreen({ go, goBack, ctx }) {
   const dbKey = ctx?.dbKey || (ctx?.dbId ? "custom" : "tasks");
   const subDbId = ctx?.dbId;
@@ -881,6 +1427,7 @@ function EventEditScreen({ go, goBack, ctx }) {
   const dbLabel = ctx?.subTitle || DB_LABEL[dbKey] || "페이지";
   const isFinance = dbKey === "finance";
   const isTask = dbKey === "tasks";
+  const isGenericDb = !!subDbId && !isFinance;
   const suggestionsByDb = {
     tasks: ["내일 10시 디자인 리뷰", "금요일 오후 2시 고객 미팅", "다음주 월요일 스탠드업"],
     works: ["새 프로젝트", "리서치", "아이디어"],
@@ -909,6 +1456,31 @@ function EventEditScreen({ go, goBack, ctx }) {
   const [financeAmount, setFinanceAmount] = uS3(""); // string so we can show empty
   const [financeDate, setFinanceDate] = uS3(() => ctx?.date || todayIso);
   const [financeMemo, setFinanceMemo] = uS3("");
+  const [genericSchema, setGenericSchema] = uS3([]);
+  const [genericLoading, setGenericLoading] = uS3(false);
+  const [genericValues, setGenericValues] = uS3({});
+
+  uE3(() => {
+    if (!isGenericDb || !targetDbId) return;
+    let mounted = true;
+    setGenericLoading(true);
+    window.nmFetch(`/api/database-pages?dbId=${encodeURIComponent(targetDbId)}`, { ttl: 120000 })
+      .then(j => {
+        if (!mounted) return;
+        const schema = Array.isArray(j?.schema) ? j.schema : [];
+        setGenericSchema(schema);
+        setGenericValues(initialGenericValues(schema, ctx, nowParts));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setGenericSchema([]);
+      })
+      .finally(() => {
+        if (mounted) setGenericLoading(false);
+      });
+    return () => { mounted = false; };
+  }, [isGenericDb, targetDbId]);
+
   const invalidateCreatedDb = () => {
     if (subDbId) window.nmInvalidate && window.nmInvalidate(`/api/database-pages?dbId=${subDbId}`);
     const url = window.nmCoreEndpoint?.(dbKey);
@@ -957,6 +1529,26 @@ function EventEditScreen({ go, goBack, ctx }) {
     setSaving(true);
     setSaveError(null);
     try {
+      if (isGenericDb) {
+        const properties = buildGenericPageProperties(genericSchema, genericValues);
+        const res = await fetch("/api/pages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dbId: targetDbId,
+            title: title.trim(),
+            properties,
+          }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || `HTTP ${res.status}`);
+        }
+        invalidateCreatedDb();
+        goBack ? goBack() : go("home");
+        return;
+      }
+
       // Build optional Date property. /api/pages also auto-discovers date property
       // names, but this keeps the common Beyond_Tasks path explicit.
       const extraProps = {};
@@ -985,7 +1577,8 @@ function EventEditScreen({ go, goBack, ctx }) {
 
   const canSave = isFinance
     ? (title.trim() && Number(financeAmount) > 0 && financeType)
-    : !!title.trim();
+    : (isGenericDb ? (!!title.trim() && !genericLoading) : !!title.trim());
+  const creatableGenericProps = genericSchema.filter(p => p.type !== "title" && (GENERIC_CREATABLE_TYPES.has(p.type) || GENERIC_READONLY_TYPES.has(p.type)));
   return (
     <>
       {/* Dim backdrop */}
@@ -1128,6 +1721,29 @@ function EventEditScreen({ go, goBack, ctx }) {
                     onChange={e => setFinanceMemo(e.target.value)}
                     style={{flex: 1, border: "none", outline: "none", background: "transparent", resize: "none", font: "inherit", fontSize: 16, color: "var(--n-text)"}}/>
                 </div>
+              </div>
+            </>
+          ) : isGenericDb ? (
+            <>
+              <div className="g-list">
+                {genericLoading ? (
+                  <div className="g-row">
+                    <div style={{flex: 1, textAlign: "center"}} className="t-body muted">속성 불러오는 중...</div>
+                  </div>
+                ) : creatableGenericProps.length ? (
+                  creatableGenericProps.map(prop => (
+                    <GenericPropertyField
+                      key={`${prop.name}-${prop.type}`}
+                      prop={prop}
+                      value={genericValues[prop.name]}
+                      onChange={(value) => setGenericValues(prev => ({...prev, [prop.name]: value}))}
+                    />
+                  ))
+                ) : (
+                  <div className="g-row">
+                    <div style={{flex: 1, textAlign: "center"}} className="t-body muted">추가 가능한 속성 없음</div>
+                  </div>
+                )}
               </div>
             </>
           ) : (
