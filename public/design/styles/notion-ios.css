@@ -347,10 +347,6 @@ html, body {
   pointer-events: auto;
 }
 
-.nm-bottom-safe-cover {
-  display: none;
-}
-
 html[data-keyboard-open] .tabbar {
   display: none;
 }
@@ -381,7 +377,7 @@ html[data-keyboard-open] .tabbar {
   }
 
   .tabbar {
-    position: absolute;
+    position: fixed;
     left: 12px;
     right: 12px;
     bottom: var(--nm-tabbar-bottom);
@@ -389,22 +385,9 @@ html[data-keyboard-open] .tabbar {
     border-radius: 22px;
     align-items: center;
     padding: 0 6px;
-    z-index: 2147483002;
+    z-index: 2147483647;
     transform: translateZ(0);
     box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 10px 28px rgba(0,0,0,0.10);
-  }
-
-  .nm-bottom-safe-cover {
-    display: block;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: max(44px, calc(var(--safe-b) + 18px));
-    background: var(--n-bg-grouped);
-    z-index: 2147482990;
-    pointer-events: none;
-    transform: translateZ(0);
   }
 
   .tab-item {

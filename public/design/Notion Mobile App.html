@@ -65,7 +65,6 @@
     const vv = window.visualViewport;
     const tab = document.querySelector(".tabbar")?.getBoundingClientRect();
     const phone = document.querySelector(".phone")?.getBoundingClientRect();
-    const bottomCover = document.querySelector(".nm-bottom-safe-cover")?.getBoundingClientRect();
     const rootStyle = getComputedStyle(document.documentElement);
     return {
       href: location.href,
@@ -81,7 +80,6 @@
       keyboard: rootStyle.getPropertyValue("--nm-keyboard-bottom").trim(),
       phone: phone ? [Math.round(phone.top), Math.round(phone.bottom), Math.round(phone.height)] : null,
       tabbar: tab ? [Math.round(tab.top), Math.round(tab.bottom), Math.round(tab.height)] : null,
-      bottomCover: bottomCover ? [Math.round(bottomCover.top), Math.round(bottomCover.bottom), Math.round(bottomCover.height)] : null,
     };
   }
 
@@ -269,7 +267,6 @@
 <div class="stage">
   <div id="phone-root"></div>
 </div>
-<div class="nm-bottom-safe-cover" aria-hidden="true"></div>
 
 <div class="screen-picker" id="screen-picker"></div>
 

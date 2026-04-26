@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nolio-pwa-v31-20260426-bottom-safe-cover";
+const CACHE_VERSION = "nolio-pwa-v32-20260427-tabbar-top-layer";
 const APP_SHELL = [
   "/manifest.json",
   "/offline.html",
